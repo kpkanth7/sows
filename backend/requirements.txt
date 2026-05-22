@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+httpx
+sqlalchemy
+psycopg2-binary
+pydantic
+pydantic-settings
+python-dotenv
+langgraph
+kafka-python
+pandas
+numpy
+timesfm
+transformers
+apscheduler
