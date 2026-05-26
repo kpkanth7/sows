@@ -15,9 +15,13 @@ export default function LiveTicker() {
         return;
       }
       
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
       const { data, error } = await supabase
         .from('news_items')
         .select('title, buzz_score, entity_names')
+        .gte('ingested_at', threeDaysAgo.toISOString())
         .order('buzz_score', { ascending: false })
         .limit(15);
         

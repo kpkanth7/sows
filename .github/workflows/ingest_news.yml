@@ -1,9 +1,7 @@
-name: Ingest News (Every 30 min)
+name: Ingest News (Manual - Deprecated)
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:  # Allow manual trigger only
 
 jobs:
   ingest:

@@ -4,7 +4,7 @@ export default function CompanyCard({ company, onClick }) {
   const isUp = company.change_pct_24h > 0;
   
   return (
-    <div className="card glass-panel strip-card cursor-pointer" onClick={() => onClick(company)} style={{ cursor: 'pointer' }}>
+    <div className="card glass-panel cursor-pointer" onClick={() => onClick(company)} style={{ cursor: 'pointer' }}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           {company.logo_url ? (

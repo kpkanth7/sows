@@ -26,11 +26,19 @@ export default function NewsSection() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const observerTarget = useRef(null);
 
   const fetchNews = async (pageNum, cat, append = false) => {
     setLoading(true);
-    let query = supabase.from('news_items').select('*').order('ingested_at', { ascending: false }).range(pageNum * 20, (pageNum + 1) * 20 - 1);
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+    let query = supabase.from('news_items')
+      .select('*')
+      .gte('ingested_at', threeDaysAgo.toISOString())
+      .order('ingested_at', { ascending: false })
+      .range(pageNum * 20, (pageNum + 1) * 20 - 1);
     
     const mappedCat = mapCategory(cat);
     if (mappedCat) {
@@ -39,16 +47,22 @@ export default function NewsSection() {
     
     const { data, error } = await query;
     if (!error && data) {
+      if (data.length < 20) {
+        setHasMore(false);
+      }
       if (append) {
         setNews(prev => [...prev, ...data]);
       } else {
         setNews(data);
       }
+    } else {
+      setHasMore(false);
     }
     setLoading(false);
   };
 
   useEffect(() => {
+    setHasMore(true);
     fetchNews(0, activeCategory, false);
     setPage(0);
   }, [activeCategory]);
@@ -56,7 +70,7 @@ export default function NewsSection() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && !loading && news.length > 0) {
+        if (entries[0].isIntersecting && !loading && news.length > 0 && hasMore) {
           const nextPage = page + 1;
           setPage(nextPage);
           fetchNews(nextPage, activeCategory, true);
@@ -69,7 +83,7 @@ export default function NewsSection() {
       observer.observe(observerTarget.current);
     }
     return () => observer.disconnect();
-  }, [page, loading, news.length, activeCategory]);
+  }, [page, loading, news.length, activeCategory, hasMore]);
 
   const hero = news.length > 0 ? [...news].sort((a,b) => b.buzz_score - a.buzz_score)[0] : null;
   const gridItems = news.filter(n => n.id !== hero?.id).slice(0, 6);

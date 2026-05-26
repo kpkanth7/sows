@@ -53,11 +53,11 @@ export default function CompanyDashboard() {
       </div>
 
       {loading ? (
-        <div className="horizontal-strip">
-          {[...Array(5)].map((_, i) => <div key={i} className="skeleton strip-card" style={{ height: '220px' }}></div>)}
+        <div className="grid-cols-3" style={{ padding: '1rem 0' }}>
+          {[...Array(6)].map((_, i) => <div key={i} className="skeleton card" style={{ height: '220px' }}></div>)}
         </div>
       ) : (
-        <div className="horizontal-strip">
+        <div className="grid-cols-3" style={{ padding: '1rem 0' }}>
           {filtered.map(company => (
             <CompanyCard key={company.id} company={company} onClick={setSelectedCompany} />
           ))}

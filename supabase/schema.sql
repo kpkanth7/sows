@@ -266,12 +266,11 @@ CREATE TABLE IF NOT EXISTS events_calendar (
     event_type      TEXT CHECK (event_type IN ('conference','earnings','ipo','product_launch','acquisition','funding')),
     description     TEXT,
     url             TEXT,
-    is_upcoming     BOOLEAN GENERATED ALWAYS AS (event_date >= CURRENT_DATE) STORED,
+    is_upcoming     BOOLEAN, -- Computed on frontend or updated via worker
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_events_date ON events_calendar(event_date);
-CREATE INDEX idx_events_upcoming ON events_calendar(event_date) WHERE event_date >= CURRENT_DATE;
 
 -- ============================================================
 -- COMPANY POLL CONFIG (tier management)

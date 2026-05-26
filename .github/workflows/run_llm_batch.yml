@@ -1,8 +1,6 @@
-name: LLM Batch Processing (every 6hr)
+name: LLM Batch Processing (Manual - Deprecated)
 
 on:
-  schedule:
-    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:

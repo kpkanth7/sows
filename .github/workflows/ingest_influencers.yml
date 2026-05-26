@@ -1,8 +1,6 @@
-name: Ingest Influencers (YouTube + Bluesky, every 2hr)
+name: Ingest Influencers (Manual - Deprecated)
 
 on:
-  schedule:
-    - cron: "0 */2 * * *"
   workflow_dispatch:
 
 jobs:

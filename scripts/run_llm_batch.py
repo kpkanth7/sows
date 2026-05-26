@@ -2,12 +2,74 @@ import os
 import json
 import logging
 import time
+import httpx
 from datetime import datetime, timedelta, timezone
 import google.generativeai as genai
 from db import get_client, check_quota, log_api_call
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def generate_llm_content(prompt: str, sb, max_tokens: int = None) -> str:
+    provider = os.environ.get('LLM_PROVIDER', 'gemini').lower()
+    model_name = os.environ.get('LLM_MODEL')
+    
+    if provider == 'groq':
+        api_key = os.environ.get('GROQ_API_KEY')
+        if not api_key:
+            logger.warning("GROQ_API_KEY not set, falling back to gemini")
+            provider = 'gemini'
+        else:
+            model = model_name or 'llama-3.3-70b-versatile'
+            try:
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2
+                }
+                if max_tokens:
+                    payload["max_tokens"] = max_tokens
+                    
+                resp = httpx.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=60)
+                resp.raise_for_status()
+                log_api_call(sb, 'gemini', 1)  # Share tracking metric
+                res_data = resp.json()
+                return res_data['choices'][0]['message']['content']
+            except Exception as e:
+                logger.error(f"Groq API error: {e}, falling back to gemini")
+                provider = 'gemini'
+                
+    if provider == 'gemini':
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            raise Exception("GEMINI_API_KEY not set")
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name or 'gemini-2.0-flash')
+        
+        max_retries = 5
+        backoff = 10
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(prompt)
+                log_api_call(sb, 'gemini', 1)
+                return response.text
+            except Exception as e:
+                err_msg = str(e)
+                if '429' in err_msg or 'ResourceExhausted' in err_msg or 'Quota exceeded' in err_msg:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Gemini API rate limit hit. Sleeping for {backoff}s before retry {attempt + 1}/{max_retries}...")
+                        time.sleep(backoff)
+                        backoff *= 2
+                    else:
+                        raise e
+                else:
+                    raise e
+    
+    raise Exception(f"Unsupported LLM provider: {provider}")
 
 def process_news_batch(sb, items):
     if not items:
@@ -18,11 +80,7 @@ def process_news_batch(sb, items):
         prompt += f"Item {i+1}: {item['title']}\n"
         
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        log_api_call(sb, 'gemini', 1)
-        
-        text = response.text
+        text = generate_llm_content(prompt, sb)
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
         elif "```" in text:
@@ -53,6 +111,8 @@ def process_news_batch(sb, items):
                             'reality_score': new_real
                         }).eq('id', cid).execute()
                         
+        time.sleep(4)
+                        
     except Exception as e:
         logger.error(f"Error processing news batch: {e}")
 
@@ -66,8 +126,6 @@ def run_dispute_detection(sb):
         entities = {}
         for c in claims:
             entities.setdefault(c['entity_name'], []).append(c)
-            
-        model = genai.GenerativeModel('gemini-1.5-flash')
             
         for entity, entity_claims in entities.items():
             if len(entity_claims) < 2:
@@ -84,16 +142,14 @@ def run_dispute_detection(sb):
                     prompt = f"Do these two claims contradict each other? Claim 1: '{c1['claim_text']}'. Claim 2: '{c2['claim_text']}'. Answer with only YES or NO."
                     
                     if check_quota(sb, 'gemini', 1):
-                        resp = model.generate_content(prompt)
-                        log_api_call(sb, 'gemini', 1)
-                        if "YES" in resp.text.upper():
+                        resp_text = generate_llm_content(prompt, sb)
+                        if "YES" in resp_text.upper():
                             conf1 = float(c1['credibility_weight']) * 100
                             conf2 = float(c2['credibility_weight']) * 100
                             
                             if conf1 <= 75 and conf2 <= 75:
                                 brief_prompt = f"Write a 2 sentence dispute brief comparing these two claims: 1: {c1['claim_text']} 2: {c2['claim_text']}"
-                                brief_resp = model.generate_content(brief_prompt)
-                                log_api_call(sb, 'gemini', 1)
+                                brief_text = generate_llm_content(brief_prompt, sb)
                                 
                                 if c1.get('news_item_id'):
                                     sb.table('news_items').update({
@@ -102,9 +158,11 @@ def run_dispute_detection(sb):
                                         'dispute_confidence_a': conf1,
                                         'dispute_claim_b': c2['claim_text'],
                                         'dispute_confidence_b': conf2,
-                                        'dispute_brief': brief_resp.text.strip(),
+                                        'dispute_brief': brief_text.strip(),
                                         'dispute_checked': True
                                     }).eq('id', c1['news_item_id']).execute()
+                                    
+                        time.sleep(4)
                                     
     except Exception as e:
         logger.error(f"Error in dispute detection: {e}")
@@ -115,46 +173,94 @@ def update_company_briefs(sb):
         res = sb.table('companies').select('*').in_('poll_tier', [1, 2]).execute()
         companies = res.data
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        if not check_quota(sb, 'gemini', 1):
+            logger.warning("Gemini quota reached before processing briefs.")
+            return
+
+        time_limit = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        
+        # Build one massive prompt for all companies
+        prompt = "You are a senior tech analyst. I will provide recent news and signals for multiple tech companies. Update the investor brief for EACH company.\n\n"
         
         for comp in companies:
-            if not check_quota(sb, 'gemini', 1):
-                break
-                
-            prompt = f"Provide a short investor brief and a forecast_direction (must be exactly one of: strong_bullish, bullish, neutral, bearish, high_risk) for {comp['name']} based on recent market conditions. Return JSON format: {{'forecast_direction': '...', 'investor_brief': '...', 'forecast_confidence': 80}}"
-            resp = model.generate_content(prompt)
-            log_api_call(sb, 'gemini', 1)
+            news_res = sb.table('news_items').select('title, summary, source_type').contains('entity_names', f'["{comp["name"]}"]').gte('ingested_at', time_limit).order('ingested_at', desc=True).limit(5).execute()
+            comm_res = sb.table('community_signals').select('post_title, sentiment').eq('entity_name', comp['name']).gte('captured_at', time_limit).order('captured_at', desc=True).limit(3).execute()
+            inf_res = sb.table('influencer_signals').select('content_title').eq('entity_name', comp['name']).gte('published_at', time_limit).order('published_at', desc=True).limit(3).execute()
             
-            text = resp.text
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0]
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0]
+            prompt += f"--- COMPANY: {comp['name']} ---\n"
+            prompt += f"Is Private: {comp.get('is_private', False)}\n"
+            prompt += "RECENT SIGNALS:\n"
+            for n in news_res.data:
+                prompt += f"- [NEWS] {n['title']} ({n['summary']})\n"
+            for c in comm_res.data:
+                prompt += f"- [COMM] {c['post_title']} (sentiment: {c['sentiment']})\n"
+            for i in inf_res.data:
+                prompt += f"- [INFL] {i['content_title']}\n\n"
                 
+        prompt += """
+For EACH company provided, you must output a JSON object with its name as the key.
+For each company, provide:
+- "investor_brief": "2-sentence analysis based on the recent signals"
+- "forecast_direction": "bullish", "bearish", or "neutral"
+- "forecast_confidence": 0-100
+
+Return ONLY a valid JSON object where keys are the exact company names. Example:
+{
+  "Google": { "investor_brief": "...", "forecast_direction": "bullish", "forecast_confidence": 85 },
+  "OpenAI": { "investor_brief": "...", "forecast_direction": "bullish", "forecast_confidence": 90 }
+}
+"""
+        
+        max_retries = 3
+        text = ""
+        for attempt in range(max_retries):
             try:
-                data = json.loads(text.strip())
-                sb.table('companies').update({
-                    'forecast_direction': data.get('forecast_direction', 'neutral'),
-                    'investor_brief': data.get('investor_brief', ''),
-                    'forecast_confidence': data.get('forecast_confidence', 50)
-                }).eq('id', comp['id']).execute()
+                text = generate_llm_content(prompt, sb)
+                break
             except Exception as e:
-                logger.error(f"Error parsing Gemini JSON for company {comp['name']}: {e}")
-                
+                if '429' in str(e) and attempt < max_retries - 1:
+                    logger.warning(f"Rate limited. Sleeping for 30s before retry {attempt + 1}/{max_retries}...")
+                    time.sleep(30)
+                else:
+                    raise e
+        
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+            
+        try:
+            results = json.loads(text.strip())
+            for comp in companies:
+                cname = comp['name']
+                if cname in results:
+                    data = results[cname]
+                    update_data = {
+                        'forecast_direction': data.get('forecast_direction', 'neutral'),
+                        'investor_brief': data.get('investor_brief', ''),
+                        'forecast_confidence': data.get('forecast_confidence', 50)
+                    }
+                    sb.table('companies').update(update_data).eq('id', comp['id']).execute()
+        except Exception as e:
+            logger.error(f"Error parsing Gemini batch JSON: {e}")
+            
     except Exception as e:
         logger.error(f"Error updating company briefs: {e}")
 
 def main():
     sb = get_client()
-    api_key = os.environ.get('GEMINI_API_KEY')
+    provider = os.environ.get('LLM_PROVIDER', 'gemini').lower()
+    if provider == 'groq':
+        api_key = os.environ.get('GROQ_API_KEY')
+    else:
+        api_key = os.environ.get('GEMINI_API_KEY')
+        
     if not api_key:
-        logger.warning("GEMINI_API_KEY not set")
+        logger.warning(f"API key not set for provider {provider}")
         return
         
-    genai.configure(api_key=api_key)
-    
     if not check_quota(sb, 'gemini', 1):
-        logger.warning("Gemini quota limit reached")
+        logger.warning("Quota limit reached")
         return
         
     six_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()

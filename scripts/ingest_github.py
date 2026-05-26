@@ -67,6 +67,7 @@ def main():
             if stars > 1000:
                 news_item = {
                     'title': f"Trending Repo: {repo_name} ({stars} stars)",
+                    'summary': desc or f"Trending repository {repo_name} with {stars} stars.",
                     'url': repo_url,
                     'source': 'github',
                     'source_type': 'code',
@@ -117,8 +118,13 @@ def main():
                                 'release_date': release['published_at']
                             }).execute()
                             
+                            rel_body = release.get('body') or ''
+                            if len(rel_body) > 300:
+                                rel_body = rel_body[:297] + "..."
+                            
                             news_item = {
                                 'title': f"New Release: {repo_name} {release['tag_name']}",
+                                'summary': rel_body or f"New release {release['tag_name']} for {repo_name}.",
                                 'url': release['html_url'],
                                 'source': 'github',
                                 'source_type': 'code',

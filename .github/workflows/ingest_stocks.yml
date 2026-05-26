@@ -11,6 +11,9 @@ on:
         required: false
         default: "all"
 
+env:
+  PYTHONPATH: scripts
+
 jobs:
   tier1:
     name: Tier 1 Stocks (15min)
@@ -29,14 +32,14 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
-        run: python -m scripts.ingest_stocks --tier 1
+        run: python scripts/ingest_stocks.py --tier 1
 
   tier2:
     name: Tier 2 Stocks (hourly)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Only runs on the top of each hour (when minute = 0)
-    if: ${{ github.event.schedule == '*/15 * * * *' && startsWith(github.run_attempt, '1') }} 
+    # Only runs on the top of each hour (when minute = 0) or manually
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.schedule == '*/15 * * * *' && startsWith(github.run_attempt, '1')) }} 
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,8 +55,8 @@ jobs:
           ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
         run: |
           MINUTE=$(date +%-M)
-          if [ "$MINUTE" -eq 0 ]; then
-            python -m scripts.ingest_stocks --tier 2
+          if [ "$MINUTE" -eq 0 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python scripts/ingest_stocks.py --tier 2
           else
             echo "Skipping Tier 2 (not top of hour)"
           fi
@@ -77,9 +80,9 @@ jobs:
           ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
         run: |
           HOUR=$(date +%-H)
-          if [ "$HOUR" -eq 0 ] || [ "$HOUR" -eq 6 ] || [ "$HOUR" -eq 12 ] || [ "$HOUR" -eq 18 ]; then
+          if [ "$HOUR" -eq 0 ] || [ "$HOUR" -eq 6 ] || [ "$HOUR" -eq 12 ] || [ "$HOUR" -eq 18 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MINUTE=$(date +%-M)
-            if [ "$MINUTE" -lt 15 ]; then
-              python -m scripts.ingest_stocks --tier 3
+            if [ "$MINUTE" -lt 15 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              python scripts/ingest_stocks.py --tier 3
             fi
           fi
