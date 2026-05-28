@@ -18,7 +18,13 @@ Fixes for failing actions + silent bugs. Highest value, lowest effort.
 - [x] **0.6** `ingest_and_process.yml`: `continue-on-error: true` on steps 2-6b, 8, 9. News(1) + LLM(7) stay hard-fail.
 - [x] **0.7** RLS already in schema (ENABLE + read-only policies all tables). Added public-read policy for new `health_checks`. NOTE: verify applied in live Supabase.
 
-**Review checkpoint** → re-run `supabase/schema.sql` in Supabase SQL Editor (adds health_checks + confirms RLS/keepalive), push, confirm actions green before Phase 1.
+**Review checkpoint** → DONE. Schema re-run OK, pushed, `Ingest & Process` ran green (all 14 steps).
+
+**ROOT CAUSE of "actions keep failing" found:** GitHub repo secrets were never set (empty `SUPABASE_URL` etc in CI) → every scheduled job crashed at `get_client()`. Local worked via `.env`. Fixed by bulk-loading secrets from `.env` (with `</dev/null` so `gh` doesn't eat loop stdin). Added Groq primary + Gemini fallback for LLM.
+
+**Schema made idempotent:** all `CREATE INDEX` → `IF NOT EXISTS`; all policies prefixed `DROP POLICY IF EXISTS`. Re-runnable now.
+
+**Carry to later:** bump `actions/checkout@v4`+`setup-python@v5` (Node20 deprecation, June 2026) → Phase 4. Dead `LLM_API_KEY` in `.env` (code ignores) → reconcile Phase 1.
 
 ---
 
