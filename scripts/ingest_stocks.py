@@ -123,4 +123,10 @@ def main():
             logger.error(f"Error processing stock for {name}: {e}")
 
 if __name__ == '__main__':
-    main()
+    from db import get_client, record_health
+    try:
+        main()
+        record_health(get_client(), 'ingest_stocks', 'ok')
+    except Exception as e:
+        record_health(get_client(), 'ingest_stocks', 'error', str(e))
+        raise

@@ -107,4 +107,10 @@ def main():
             logger.error(f"Error processing bluesky handle {handle}: {e}")
 
 if __name__ == '__main__':
-    main()
+    from db import get_client, record_health
+    try:
+        main()
+        record_health(get_client(), 'ingest_bluesky', 'ok')
+    except Exception as e:
+        record_health(get_client(), 'ingest_bluesky', 'error', str(e))
+        raise

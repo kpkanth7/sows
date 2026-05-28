@@ -43,22 +43,41 @@ def check_quota(sb: Client, source_name: str, cost: int = 1) -> bool:
         return True
     except Exception as e:
         logger.error(f"Error in check_quota: {e}")
-        return True
+        return False  # Fail-safe: deny on error rather than blow past API limits
 
 def log_api_call(sb: Client, source_name: str, cost: int = 1):
-    """Increment daily counter"""
+    """Increment daily counter. Upserts the row if it does not exist yet."""
     try:
         res = sb.table("api_quota_log").select("calls_today").eq("source_name", source_name).execute()
         if not res.data:
+            # No row yet — create one so tracking works on a fresh DB
+            sb.table("api_quota_log").upsert({
+                "source_name": source_name,
+                "calls_today": cost,
+                "daily_limit": 1000,
+                "last_reset": str(date.today())
+            }, on_conflict="source_name").execute()
             return
         row = res.data[0]
-        calls_today = row.get("calls_today", 0) + cost
-        
+        calls_today = (row.get("calls_today") or 0) + cost
+
         sb.table("api_quota_log").update({
             "calls_today": calls_today
         }).eq("source_name", source_name).execute()
     except Exception as e:
         logger.error(f"Error in log_api_call: {e}")
+
+def record_health(sb: Client, job_name: str, status: str, detail: str = None):
+    """Write last-run status for a job so failures are visible on the dashboard."""
+    try:
+        sb.table("health_checks").upsert({
+            "job_name": job_name,
+            "status": status,
+            "detail": (detail or "")[:500],
+            "last_run": "now()"
+        }, on_conflict="job_name").execute()
+    except Exception as e:
+        logger.error(f"Error in record_health for {job_name}: {e}")
 
 COMPANY_SYNONYMS = {
     'Google': ['googl', 'goog', 'alphabet', 'google cloud', 'gemma', 'gemma-2', 'gemini'],

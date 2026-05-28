@@ -148,4 +148,10 @@ def main():
     logger.info("ingest_huggingface completed.")
 
 if __name__ == '__main__':
-    main()
+    from db import get_client, record_health
+    try:
+        main()
+        record_health(get_client(), 'ingest_huggingface', 'ok')
+    except Exception as e:
+        record_health(get_client(), 'ingest_huggingface', 'error', str(e))
+        raise

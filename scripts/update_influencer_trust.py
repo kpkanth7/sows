@@ -66,4 +66,10 @@ def main():
         logger.error(f"Error updating influencer trust: {e}")
 
 if __name__ == '__main__':
-    main()
+    from db import get_client, record_health
+    try:
+        main()
+        record_health(get_client(), 'update_influencer_trust', 'ok')
+    except Exception as e:
+        record_health(get_client(), 'update_influencer_trust', 'error', str(e))
+        raise

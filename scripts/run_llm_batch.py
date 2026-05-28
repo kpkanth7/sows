@@ -280,4 +280,10 @@ def main():
     update_company_briefs(sb)
 
 if __name__ == '__main__':
-    main()
+    from db import get_client, record_health
+    try:
+        main()
+        record_health(get_client(), 'run_llm_batch', 'ok')
+    except Exception as e:
+        record_health(get_client(), 'run_llm_batch', 'error', str(e))
+        raise

@@ -141,4 +141,10 @@ def main():
             logger.error(f"Error fetching github events for {org}: {e}")
 
 if __name__ == '__main__':
-    main()
+    from db import get_client, record_health
+    try:
+        main()
+        record_health(get_client(), 'ingest_github', 'ok')
+    except Exception as e:
+        record_health(get_client(), 'ingest_github', 'error', str(e))
+        raise

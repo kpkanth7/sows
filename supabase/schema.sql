@@ -60,9 +60,9 @@ CREATE TABLE IF NOT EXISTS companies (
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_companies_ticker ON companies(ticker);
-CREATE INDEX idx_companies_poll_tier ON companies(poll_tier);
-CREATE INDEX idx_companies_buzz ON companies(buzz_score DESC);
+CREATE INDEX IF NOT EXISTS idx_companies_ticker ON companies(ticker);
+CREATE INDEX IF NOT EXISTS idx_companies_poll_tier ON companies(poll_tier);
+CREATE INDEX IF NOT EXISTS idx_companies_buzz ON companies(buzz_score DESC);
 
 -- ============================================================
 -- STOCK SNAPSHOTS (time-series)
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS stock_snapshots (
     captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_stock_snapshots_company_time ON stock_snapshots(company_id, captured_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_snapshots_company_time ON stock_snapshots(company_id, captured_at DESC);
 
 -- ============================================================
 -- NEWS ITEMS
@@ -124,12 +124,12 @@ CREATE TABLE IF NOT EXISTS news_items (
     ingested_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_news_ingested ON news_items(ingested_at DESC);
-CREATE INDEX idx_news_category ON news_items(category);
-CREATE INDEX idx_news_buzz ON news_items(buzz_score DESC);
-CREATE INDEX idx_news_disputed ON news_items(is_disputed) WHERE is_disputed = true;
-CREATE INDEX idx_news_entities ON news_items USING GIN(entity_names);
-CREATE INDEX idx_news_llm_unprocessed ON news_items(llm_processed) WHERE llm_processed = false;
+CREATE INDEX IF NOT EXISTS idx_news_ingested ON news_items(ingested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_news_category ON news_items(category);
+CREATE INDEX IF NOT EXISTS idx_news_buzz ON news_items(buzz_score DESC);
+CREATE INDEX IF NOT EXISTS idx_news_disputed ON news_items(is_disputed) WHERE is_disputed = true;
+CREATE INDEX IF NOT EXISTS idx_news_entities ON news_items USING GIN(entity_names);
+CREATE INDEX IF NOT EXISTS idx_news_llm_unprocessed ON news_items(llm_processed) WHERE llm_processed = false;
 
 -- ============================================================
 -- CLAIMS (for influencer trust tracking + dispute engine)
@@ -149,9 +149,9 @@ CREATE TABLE IF NOT EXISTS claims (
     validated_by        TEXT                  -- source that confirmed/refuted
 );
 
-CREATE INDEX idx_claims_entity ON claims(entity_name);
-CREATE INDEX idx_claims_validated ON claims(validated) WHERE validated IS NULL;
-CREATE INDEX idx_claims_made_at ON claims(made_at DESC);
+CREATE INDEX IF NOT EXISTS idx_claims_entity ON claims(entity_name);
+CREATE INDEX IF NOT EXISTS idx_claims_validated ON claims(validated) WHERE validated IS NULL;
+CREATE INDEX IF NOT EXISTS idx_claims_made_at ON claims(made_at DESC);
 
 -- ============================================================
 -- INFLUENCERS
@@ -189,8 +189,8 @@ CREATE TABLE IF NOT EXISTS influencer_signals (
     ingested_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_inf_signals_entity ON influencer_signals(entity_name);
-CREATE INDEX idx_inf_signals_published ON influencer_signals(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inf_signals_entity ON influencer_signals(entity_name);
+CREATE INDEX IF NOT EXISTS idx_inf_signals_published ON influencer_signals(published_at DESC);
 
 -- ============================================================
 -- COMMUNITY SIGNALS (Reddit, HN)
@@ -207,8 +207,8 @@ CREATE TABLE IF NOT EXISTS community_signals (
     captured_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_community_entity ON community_signals(entity_name);
-CREATE INDEX idx_community_captured ON community_signals(captured_at DESC);
+CREATE INDEX IF NOT EXISTS idx_community_entity ON community_signals(entity_name);
+CREATE INDEX IF NOT EXISTS idx_community_captured ON community_signals(captured_at DESC);
 
 -- ============================================================
 -- GITHUB SIGNALS
@@ -229,9 +229,9 @@ CREATE TABLE IF NOT EXISTS github_signals (
     captured_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_github_company ON github_signals(company_id);
-CREATE INDEX idx_github_trending ON github_signals(is_trending) WHERE is_trending = true;
-CREATE INDEX idx_github_stars ON github_signals(stars DESC);
+CREATE INDEX IF NOT EXISTS idx_github_company ON github_signals(company_id);
+CREATE INDEX IF NOT EXISTS idx_github_trending ON github_signals(is_trending) WHERE is_trending = true;
+CREATE INDEX IF NOT EXISTS idx_github_stars ON github_signals(stars DESC);
 
 -- ============================================================
 -- AI BENCHMARKS
@@ -251,8 +251,8 @@ CREATE TABLE IF NOT EXISTS benchmarks (
     captured_at             TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_benchmarks_company ON benchmarks(company_id);
-CREATE INDEX idx_benchmarks_name ON benchmarks(benchmark_name);
+CREATE INDEX IF NOT EXISTS idx_benchmarks_company ON benchmarks(company_id);
+CREATE INDEX IF NOT EXISTS idx_benchmarks_name ON benchmarks(benchmark_name);
 
 -- ============================================================
 -- EVENTS CALENDAR
@@ -270,7 +270,7 @@ CREATE TABLE IF NOT EXISTS events_calendar (
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_events_date ON events_calendar(event_date);
+CREATE INDEX IF NOT EXISTS idx_events_date ON events_calendar(event_date);
 
 -- ============================================================
 -- COMPANY POLL CONFIG (tier management)
@@ -316,6 +316,18 @@ INSERT INTO api_quota_log (source_name, calls_today, daily_limit, calls_this_min
 ON CONFLICT (source_name) DO NOTHING;
 
 -- ============================================================
+-- HEALTH CHECKS (last-run status per ingest/process job)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS health_checks (
+    job_name        TEXT PRIMARY KEY,
+    status          TEXT NOT NULL,          -- 'ok' | 'error' | 'partial'
+    detail          TEXT,                   -- short error/summary string
+    last_run        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_health_last_run ON health_checks(last_run DESC);
+
+-- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================================
 
@@ -332,20 +344,35 @@ ALTER TABLE benchmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events_calendar ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_poll_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE api_quota_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE health_checks ENABLE ROW LEVEL SECURITY;
 
 -- Public READ-ONLY policies (anon key can SELECT only)
+DROP POLICY IF EXISTS "public_read_companies" ON companies;
 CREATE POLICY "public_read_companies"         ON companies          FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_stock_snapshots" ON stock_snapshots;
 CREATE POLICY "public_read_stock_snapshots"   ON stock_snapshots    FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_news_items" ON news_items;
 CREATE POLICY "public_read_news_items"        ON news_items         FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_influencers" ON influencers;
 CREATE POLICY "public_read_influencers"       ON influencers        FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_inf_signals" ON influencer_signals;
 CREATE POLICY "public_read_inf_signals"       ON influencer_signals FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_community" ON community_signals;
 CREATE POLICY "public_read_community"         ON community_signals  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_github" ON github_signals;
 CREATE POLICY "public_read_github"            ON github_signals     FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_benchmarks" ON benchmarks;
 CREATE POLICY "public_read_benchmarks"        ON benchmarks         FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_events" ON events_calendar;
 CREATE POLICY "public_read_events"            ON events_calendar    FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_health_checks" ON health_checks;
+CREATE POLICY "public_read_health_checks"     ON health_checks      FOR SELECT USING (true);
 -- claims and poll_config and quota_log are internal — no public read
+DROP POLICY IF EXISTS "no_public_claims" ON claims;
 CREATE POLICY "no_public_claims"              ON claims             FOR SELECT USING (false);
+DROP POLICY IF EXISTS "no_public_poll_config" ON company_poll_config;
 CREATE POLICY "no_public_poll_config"         ON company_poll_config FOR SELECT USING (false);
+DROP POLICY IF EXISTS "no_public_quota_log" ON api_quota_log;
 CREATE POLICY "no_public_quota_log"           ON api_quota_log      FOR SELECT USING (false);
 
 -- NOTE: INSERT/UPDATE/DELETE are only done by GitHub Actions using the

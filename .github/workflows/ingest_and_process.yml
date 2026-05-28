@@ -34,6 +34,7 @@ jobs:
         run: python scripts/ingest_news.py
 
       - name: 2. Ingest Reddit
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -41,6 +42,7 @@ jobs:
         run: python scripts/ingest_reddit.py
 
       - name: 3. Ingest YouTube
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -48,12 +50,14 @@ jobs:
         run: python scripts/ingest_youtube.py
 
       - name: 4. Ingest Bluesky
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/ingest_bluesky.py
 
       - name: 5. Ingest GitHub
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -61,6 +65,7 @@ jobs:
         run: python scripts/ingest_github.py
 
       - name: 6. Ingest Product Hunt
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -69,6 +74,7 @@ jobs:
         run: python scripts/ingest_producthunt.py
 
       - name: 6b. Ingest Hugging Face
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -86,12 +92,14 @@ jobs:
         run: python scripts/run_llm_batch.py
 
       - name: 8. Update Influencer Trust
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/update_influencer_trust.py
 
       - name: 9. Check Buzz Spikes
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

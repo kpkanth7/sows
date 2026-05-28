@@ -1,15 +1,19 @@
 name: Ingest Stocks (Tiered)
 
+# Three independent schedules. Each job runs ONLY for its own cron line
+# (matched via github.event.schedule), so there is no fragile run_attempt
+# gating and no wasted runner minutes spinning up jobs that immediately skip.
 on:
   schedule:
-    # Tier 1: every 15 minutes
-    - cron: "*/15 * * * *"
+    - cron: "*/15 * * * *"   # Tier 1
+    - cron: "0 * * * *"      # Tier 2 (top of every hour)
+    - cron: "0 */2 * * *"    # Tier 3 (every 2 hours)
   workflow_dispatch:
     inputs:
       tier:
-        description: "Which tier to run (1, 2, 3, or all)"
+        description: "Which tier to run (1, 2, or 3)"
         required: false
-        default: "all"
+        default: "1"
 
 env:
   PYTHONPATH: scripts
@@ -19,6 +23,7 @@ jobs:
     name: Tier 1 Stocks (15min)
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    if: ${{ github.event.schedule == '*/15 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '1') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,14 +37,24 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
-        run: python scripts/ingest_stocks.py --tier 1
+        run: |
+          # Market-hours guard: skip nights/weekends to save quota.
+          # Allow pre/post-market (9:00-16:59 ET, Mon-Fri). Always run on manual dispatch.
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            HOUR=$(TZ='America/New_York' date +%-H)
+            DOW=$(TZ='America/New_York' date +%u)
+            if [ "$DOW" -gt 5 ] || [ "$HOUR" -lt 9 ] || [ "$HOUR" -gt 16 ]; then
+              echo "Market closed (DOW=$DOW HOUR=$HOUR ET) — skipping Tier 1."
+              exit 0
+            fi
+          fi
+          python scripts/ingest_stocks.py --tier 1
 
   tier2:
     name: Tier 2 Stocks (hourly)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Only runs on the top of each hour (when minute = 0) or manually
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.schedule == '*/15 * * * *' && startsWith(github.run_attempt, '1')) }} 
+    if: ${{ github.event.schedule == '0 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '2') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,42 +62,48 @@ jobs:
           python-version: "3.11"
           cache: "pip"
       - run: pip install -r scripts/requirements.txt
-      - name: Ingest Tier 2 (on the hour)
+      - name: Ingest Tier 2
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
         run: |
-          MINUTE=$(date +%-M)
-          if [ "$MINUTE" -eq 0 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python scripts/ingest_stocks.py --tier 2
-          else
-            echo "Skipping Tier 2 (not top of hour)"
-          fi
-
-  tier3:
-    name: Tier 3 Stocks (6hr)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-      - run: pip install -r scripts/requirements.txt
-      - name: Ingest Tier 3 (every 6 hours)
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-          ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
-        run: |
-          HOUR=$(date +%-H)
-          if [ "$HOUR" -eq 0 ] || [ "$HOUR" -eq 6 ] || [ "$HOUR" -eq 12 ] || [ "$HOUR" -eq 18 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MINUTE=$(date +%-M)
-            if [ "$MINUTE" -lt 15 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-              python scripts/ingest_stocks.py --tier 3
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            HOUR=$(TZ='America/New_York' date +%-H)
+            DOW=$(TZ='America/New_York' date +%u)
+            if [ "$DOW" -gt 5 ] || [ "$HOUR" -lt 9 ] || [ "$HOUR" -gt 16 ]; then
+              echo "Market closed (DOW=$DOW HOUR=$HOUR ET) — skipping Tier 2."
+              exit 0
             fi
           fi
+          python scripts/ingest_stocks.py --tier 2
+
+  tier3:
+    name: Tier 3 Stocks (2hr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ github.event.schedule == '0 */2 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '3') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r scripts/requirements.txt
+      - name: Ingest Tier 3
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            HOUR=$(TZ='America/New_York' date +%-H)
+            DOW=$(TZ='America/New_York' date +%u)
+            if [ "$DOW" -gt 5 ] || [ "$HOUR" -lt 9 ] || [ "$HOUR" -gt 16 ]; then
+              echo "Market closed (DOW=$DOW HOUR=$HOUR ET) — skipping Tier 3."
+              exit 0
+            fi
+          fi
+          python scripts/ingest_stocks.py --tier 3

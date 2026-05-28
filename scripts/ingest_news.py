@@ -326,4 +326,10 @@ def main():
     logger.info("ingest_news completed.")
 
 if __name__ == '__main__':
-    main()
+    from db import get_client, record_health
+    try:
+        main()
+        record_health(get_client(), 'ingest_news', 'ok')
+    except Exception as e:
+        record_health(get_client(), 'ingest_news', 'error', str(e))
+        raise
