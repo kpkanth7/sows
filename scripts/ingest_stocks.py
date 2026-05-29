@@ -99,12 +99,21 @@ def main():
             if price is None:
                 try:
                     stock = yf.Ticker(ticker)
-                    info = stock.info
-                    price = info.get('currentPrice')
+                    # history() works for foreign tickers (.HK/.NS/.KS/.SZ/.AX) where
+                    # finnhub (US-only) and .info often return nothing. Try it first.
+                    hist = stock.history(period='2d')
+                    if not hist.empty:
+                        price = float(hist['Close'].iloc[-1])
+                        if len(hist) >= 2:
+                            prev = float(hist['Close'].iloc[-2])
+                            if prev:
+                                change_pct = (price - prev) / prev * 100
                     if price is None:
-                        price = info.get('regularMarketPrice')
-                    if 'regularMarketChangePercent' in info and info['regularMarketChangePercent'] is not None:
-                        change_pct = info['regularMarketChangePercent'] * 100
+                        # Fallback to .info for US tickers history may miss intraday on.
+                        info = stock.info
+                        price = info.get('currentPrice') or info.get('regularMarketPrice')
+                        if change_pct is None and info.get('regularMarketChangePercent') is not None:
+                            change_pct = info['regularMarketChangePercent'] * 100
                 except Exception as e:
                     logger.error(f"Yfinance quote error for {ticker}: {e}")
                     
