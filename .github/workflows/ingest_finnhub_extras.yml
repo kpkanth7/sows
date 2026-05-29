@@ -1,0 +1,30 @@
+name: Ingest Finnhub Extras (Daily)
+
+# Earnings calendar, insider transactions, analyst recommendations,
+# upgrade/downgrade actions. Same Finnhub key as ingest_stocks; runs once a day
+# post-market-close UTC so most US filings are present.
+on:
+  schedule:
+    - cron: "30 22 * * *"   # 22:30 UTC = ~17:30 ET (after US market close)
+  workflow_dispatch:
+
+jobs:
+  ingest_finnhub_extras:
+    name: Pull Finnhub Extras
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r scripts/requirements.txt
+      - name: Run finnhub extras
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python scripts/ingest_finnhub_extras.py

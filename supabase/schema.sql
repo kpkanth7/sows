@@ -367,6 +367,66 @@ CREATE TABLE IF NOT EXISTS health_checks (
 CREATE INDEX IF NOT EXISTS idx_health_last_run ON health_checks(last_run DESC);
 
 -- ============================================================
+-- FINNHUB EXTRAS (earnings, insider, recommendations, upgrades)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS earnings_calendar (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id      UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    earnings_date   DATE NOT NULL,
+    eps_estimate    NUMERIC,
+    eps_actual      NUMERIC,
+    revenue_estimate BIGINT,
+    revenue_actual  BIGINT,
+    hour            TEXT,                  -- 'bmo' (before market), 'amc' (after market), 'dmh' (during)
+    fetched_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(company_id, earnings_date)
+);
+CREATE INDEX IF NOT EXISTS idx_earnings_date ON earnings_calendar(earnings_date);
+CREATE INDEX IF NOT EXISTS idx_earnings_company ON earnings_calendar(company_id);
+
+CREATE TABLE IF NOT EXISTS insider_transactions (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id          UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    person              TEXT,
+    position            TEXT,
+    transaction_type    TEXT,
+    share               INT,
+    change              INT,
+    transaction_date    DATE,
+    filing_date         DATE,
+    fetched_at          TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(company_id, person, transaction_date, share, change)
+);
+CREATE INDEX IF NOT EXISTS idx_insider_company_date ON insider_transactions(company_id, transaction_date DESC);
+
+CREATE TABLE IF NOT EXISTS analyst_recommendations (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id      UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    period          DATE NOT NULL,           -- Finnhub returns YYYY-MM-01 monthly buckets
+    strong_buy      INT,
+    buy             INT,
+    hold            INT,
+    sell            INT,
+    strong_sell     INT,
+    fetched_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(company_id, period)
+);
+CREATE INDEX IF NOT EXISTS idx_recs_company_period ON analyst_recommendations(company_id, period DESC);
+
+CREATE TABLE IF NOT EXISTS upgrade_downgrade (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id      UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    action          TEXT,                    -- 'up' | 'down' | 'main' | 'init' | 'reit'
+    from_grade      TEXT,
+    to_grade        TEXT,
+    firm            TEXT,
+    action_date     DATE,
+    fetched_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(company_id, firm, action_date, to_grade)
+);
+CREATE INDEX IF NOT EXISTS idx_upgrade_company_date ON upgrade_downgrade(company_id, action_date DESC);
+
+-- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================================
 
@@ -384,6 +444,10 @@ ALTER TABLE events_calendar ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_poll_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE api_quota_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE health_checks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE earnings_calendar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE insider_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analyst_recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE upgrade_downgrade ENABLE ROW LEVEL SECURITY;
 
 -- Public READ-ONLY policies (anon key can SELECT only)
 DROP POLICY IF EXISTS "public_read_companies" ON companies;
@@ -406,6 +470,14 @@ DROP POLICY IF EXISTS "public_read_events" ON events_calendar;
 CREATE POLICY "public_read_events"            ON events_calendar    FOR SELECT USING (true);
 DROP POLICY IF EXISTS "public_read_health_checks" ON health_checks;
 CREATE POLICY "public_read_health_checks"     ON health_checks      FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_earnings" ON earnings_calendar;
+CREATE POLICY "public_read_earnings"          ON earnings_calendar  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_insider" ON insider_transactions;
+CREATE POLICY "public_read_insider"           ON insider_transactions FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_recommendations" ON analyst_recommendations;
+CREATE POLICY "public_read_recommendations"   ON analyst_recommendations FOR SELECT USING (true);
+DROP POLICY IF EXISTS "public_read_upgrade_downgrade" ON upgrade_downgrade;
+CREATE POLICY "public_read_upgrade_downgrade" ON upgrade_downgrade   FOR SELECT USING (true);
 -- claims and poll_config and quota_log are internal — no public read
 DROP POLICY IF EXISTS "no_public_claims" ON claims;
 CREATE POLICY "no_public_claims"              ON claims             FOR SELECT USING (false);
