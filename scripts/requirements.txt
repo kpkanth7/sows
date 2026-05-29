@@ -6,7 +6,7 @@ atproto
 google-generativeai
 google-api-python-client==2.134.0
 finnhub-python==2.4.28
-yfinance==0.2.40
+yfinance>=0.2.54
 beautifulsoup4==4.12.3
 lxml==5.2.2
 python-dateutil==2.9.0

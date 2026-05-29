@@ -51,23 +51,13 @@ def main():
             if not check_quota(sb, 'youtube', 1):
                 logger.warning("YouTube quota limit reached")
                 break
-                
-            # Fetch uploads playlist ID dynamically
-            channel_info = youtube.channels().list(
-                part="contentDetails",
-                id=channel_id
-            ).execute()
-            log_api_call(sb, 'youtube', 1)
-            
-            if not channel_info.get('items'):
-                logger.warning(f"Channel {name} details not found on YouTube.")
-                continue
-                
-            uploads_playlist_id = channel_info['items'][0]['contentDetails']['relatedPlaylists']['uploads']
-            
+
+            # Skip the channels().list lookup — config already stores the uploads
+            # playlist_id (UC -> UU prefix swap done at config time). Saves ~27
+            # quota units per run vs the previous per-channel dynamic fetch.
             request = youtube.playlistItems().list(
                 part="snippet",
-                playlistId=uploads_playlist_id,
+                playlistId=playlist_id,
                 maxResults=5
             )
             response = request.execute()

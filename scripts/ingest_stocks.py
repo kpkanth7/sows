@@ -3,12 +3,54 @@ import time
 import argparse
 import logging
 from datetime import datetime, date, timedelta, timezone
+import httpx
 import finnhub
 import yfinance as yf
 from textblob import TextBlob
 from db import get_client, check_quota, log_api_call, extract_entities
 from companies_config import TIER1_COMPANIES, TIER2_COMPANIES, TIER3_COMPANIES, ALL_COMPANIES
 from ingest_news import save_news, calc_buzz
+
+
+# Stooq fallback (free, no key, broad global coverage). yfinance suffix -> stooq suffix.
+STOOQ_SUFFIX = {
+    '.HK': '.hk',   # Hong Kong
+    '.KS': '.kr',   # Korea
+    '.NS': '.in',   # India NSE
+    '.SZ': '.cn',   # Shenzhen
+    '.SS': '.cn',   # Shanghai
+    '.AX': '.au',   # Australia
+    '.TO': '.ca',   # Toronto
+    '.PA': '.fr',   # Paris
+    '.L':  '.uk',   # London
+}
+
+
+def _stooq_ticker(t: str) -> str:
+    for src, dst in STOOQ_SUFFIX.items():
+        if t.endswith(src):
+            return t[:-len(src)].lower() + dst
+    return t.lower() + '.us'
+
+
+def fetch_stooq_price(ticker: str):
+    """Last-resort price fallback. Stooq returns a single-row CSV; we read 'Close'.
+    Returns (price, change_pct_or_None). change_pct unavailable from this endpoint."""
+    try:
+        s = _stooq_ticker(ticker)
+        url = f"https://stooq.com/q/l/?s={s}&f=sd2t2ohlc&h&e=csv"
+        r = httpx.get(url, timeout=10)
+        r.raise_for_status()
+        lines = r.text.strip().split('\n')
+        if len(lines) < 2:
+            return None, None
+        cols = lines[1].split(',')
+        close = cols[6] if len(cols) >= 7 else None
+        if not close or close in ('N/D', ''):
+            return None, None
+        return float(close), None
+    except Exception:
+        return None, None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -116,7 +158,16 @@ def main():
                             change_pct = info['regularMarketChangePercent'] * 100
                 except Exception as e:
                     logger.error(f"Yfinance quote error for {ticker}: {e}")
-                    
+
+            # Final fallback: Stooq (free, no key, global). Covers the .HK/.KS/.NS/etc
+            # tickers that Finnhub free skips and that yfinance flakes on.
+            if price is None:
+                px, ch = fetch_stooq_price(ticker)
+                if px is not None:
+                    price = px
+                    if ch is not None:
+                        change_pct = ch
+
             if price is not None:
                 sb.table('companies').update({
                     'stock_price': price,
