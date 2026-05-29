@@ -49,24 +49,33 @@ def main():
         is_private = comp['is_private']
         sector = comp.get('sector')
         
+        # Config is the source of truth for descriptive fields + geography/valuation.
+        # Reconciled every run so edits (e.g. Figma private->public, valuation updates)
+        # propagate to existing rows. poll_tier is intentionally excluded — it is owned
+        # by check_buzz_spikes (buzz promotions), so we never overwrite it here.
+        sync = {
+            'ticker': ticker,
+            'is_private': is_private,
+            'sector': sector,
+            'is_ai_company': comp.get('is_ai_company', False),
+            'github_org': comp.get('github_org'),
+            'region': comp.get('region'),
+            'last_valuation': comp.get('last_valuation'),
+            'valuation_source': comp.get('valuation_source'),
+        }
+
         try:
             res = sb.table('companies').select('id').eq('name', name).execute()
             if not res.data:
-                sb.table('companies').insert({
-                    'name': name,
-                    'ticker': ticker,
-                    'is_private': is_private,
-                    'sector': sector,
-                    'is_ai_company': comp.get('is_ai_company', False),
-                    'github_org': comp.get('github_org'),
-                    'poll_tier': args.tier
-                }).execute()
+                sb.table('companies').insert({'name': name, 'poll_tier': args.tier, **sync}).execute()
                 res = sb.table('companies').select('id').eq('name', name).execute()
-                
+
             company_id = res.data[0]['id']
-            
+
+            # Reconcile descriptive fields for existing + new rows.
+            sb.table('companies').update({**sync, 'last_updated': 'now()'}).eq('id', company_id).execute()
+
             if is_private:
-                sb.table('companies').update({'sector': sector, 'last_updated': 'now()'}).eq('id', company_id).execute()
                 continue
 
             if not ticker:
@@ -103,7 +112,7 @@ def main():
                 sb.table('companies').update({
                     'stock_price': price,
                     'change_pct_24h': change_pct,
-                    'last_updated': 'now()'
+                    'last_updated': 'now()',
                 }).eq('id', company_id).execute()
                 
                 sb.table('stock_snapshots').insert({

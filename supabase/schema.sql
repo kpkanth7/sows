@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS companies (
     valuation_date  DATE,
     valuation_source TEXT,
 
+    -- Geography (for Market Map grouping/filtering)
+    region          TEXT,                 -- US / China / India / Europe / Korea / Japan / SE Asia / LatAm / Australia / Canada / Taiwan / Middle East
+
     -- Computed scores (updated by LLM batch)
     sentiment_score   NUMERIC(5,2) DEFAULT 50,  -- 0-100
     buzz_score        NUMERIC(5,2) DEFAULT 0,   -- 0-100
@@ -63,6 +66,10 @@ CREATE TABLE IF NOT EXISTS companies (
 CREATE INDEX IF NOT EXISTS idx_companies_ticker ON companies(ticker);
 CREATE INDEX IF NOT EXISTS idx_companies_poll_tier ON companies(poll_tier);
 CREATE INDEX IF NOT EXISTS idx_companies_buzz ON companies(buzz_score DESC);
+
+-- Idempotent add for existing DBs (CREATE TABLE above is a no-op once table exists).
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS region TEXT;
+CREATE INDEX IF NOT EXISTS idx_companies_region ON companies(region);
 
 -- ============================================================
 -- STOCK SNAPSHOTS (time-series)
