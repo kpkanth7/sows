@@ -6,7 +6,7 @@ name: Ingest Stocks (Tiered)
 on:
   schedule:
     - cron: "*/15 * * * *"   # Tier 1
-    - cron: "0 * * * *"      # Tier 2 (top of every hour)
+    - cron: "*/30 * * * *"   # Tier 2 (every 30 min) — bumped from hourly in Phase 2.11
     - cron: "0 */2 * * *"    # Tier 3 (every 2 hours)
   workflow_dispatch:
     inputs:
@@ -54,7 +54,7 @@ jobs:
     name: Tier 2 Stocks (hourly)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event.schedule == '0 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '2') }}
+    if: ${{ github.event.schedule == '*/30 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '2') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

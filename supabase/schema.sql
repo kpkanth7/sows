@@ -138,6 +138,12 @@ CREATE INDEX IF NOT EXISTS idx_news_disputed ON news_items(is_disputed) WHERE is
 CREATE INDEX IF NOT EXISTS idx_news_entities ON news_items USING GIN(entity_names);
 CREATE INDEX IF NOT EXISTS idx_news_llm_unprocessed ON news_items(llm_processed) WHERE llm_processed = false;
 
+-- Phase 2.13 Better-Buzz v2: LLM-rated relevance + composite ranking score
+-- (see run_llm_batch.compute_buzz_v2 for the formula). Both NULL for unprocessed rows.
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS relevance NUMERIC(5,2);
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS buzz_v2 NUMERIC(5,2);
+CREATE INDEX IF NOT EXISTS idx_news_buzz_v2 ON news_items(buzz_v2 DESC NULLS LAST);
+
 -- Trigram near-dup detection (replaces O(N^2) Python Jaccard scan).
 -- title_hash = MD5 of normalized, stop-word-stripped, sorted title words (exact-after-normalize dedup).
 -- GIN trigram index narrows near-dup candidates server-side; app does final Jaccard on the small candidate set.

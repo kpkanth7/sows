@@ -1,22 +1,70 @@
 import os
+import math
 import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
 from db import get_client, check_quota
 from llm import generate_llm_content, strip_json_fence
+from companies_config import TIER1_COMPANIES
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Phase 2.13: precomputed set of mega-cap names so any T1 mention boosts buzz_v2.
+TIER1_NAMES = {c['name'] for c in TIER1_COMPANIES}
+
+
+def compute_buzz_v2(item: dict, relevance: float) -> float:
+    """Composite ranking score for the news feed.
+
+      buzz_v2 = 0.5*relevance + 0.2*source_credibility + 0.15*hn_engagement + 0.15*recency
+      × 1.2 if any tracked T1 mega-cap is mentioned, capped at 100.
+
+    Inputs come from the news_items row + the LLM-rated relevance (0-100).
+    """
+    # source_credibility: tier 1 -> 100, 2 -> 75, 3 -> 50, 4 -> 25.
+    tier = item.get('source_credibility_tier') or 3
+    cred = max(0.0, 125.0 - tier * 25.0)
+
+    # hn_engagement: only HN items carry score/comments; everything else 0.
+    score = item.get('hn_score') or 0
+    comments = item.get('hn_comments') or 0
+    hn = min(100.0, math.log10(score + 1) * 30.0 + math.log10(comments + 1) * 20.0) if (score or comments) else 0.0
+
+    # recency: exponential decay with a 24h half-life-ish (decay constant 24).
+    ts_str = item.get('published_at') or item.get('ingested_at')
+    try:
+        published = datetime.fromisoformat(ts_str.replace('Z', '+00:00')) if ts_str else None
+    except Exception:
+        published = None
+    if published:
+        hours = max(0.0, (datetime.now(timezone.utc) - published).total_seconds() / 3600.0)
+        recency = 100.0 * math.exp(-hours / 24.0)
+    else:
+        recency = 50.0  # unknown publish time -> neutral
+
+    base = 0.5 * relevance + 0.2 * cred + 0.15 * hn + 0.15 * recency
+    boost = 1.2 if set(item.get('entity_names') or []) & TIER1_NAMES else 1.0
+    return round(min(100.0, base * boost), 2)
+
+
 def process_news_batch(sb, items):
     if not items:
         return
-        
-    prompt = "Analyze the following news items. For each, return a JSON object with 'category' (ai/release/ma/ipo/controversy/conference/opensource/earnings/other), 'entities' (list of company names), 'sentiment' (-1.0 to 1.0), 'summary' (1 sentence), 'hype_score' (0-100), and 'reality_score' (0-100). Return a JSON array of these objects in the exact same order.\n\n"
+
+    prompt = (
+        "Analyze the following news items. For each, return a JSON object with "
+        "'category' (ai/release/ma/ipo/controversy/conference/opensource/earnings/other), "
+        "'entities' (list of company names), 'sentiment' (-1.0 to 1.0), "
+        "'summary' (1 sentence), 'hype_score' (0-100), 'reality_score' (0-100), "
+        "and 'relevance' (0-100, how much a tech investor should care about this headline "
+        "— breaking M&A/earnings/lawsuit/major-product news = high; minor PR / opinion = low). "
+        "Return a JSON array of these objects in the exact same order.\n\n"
+    )
     for i, item in enumerate(items):
         prompt += f"Item {i+1}: {item['title']}\n"
-        
+
     try:
         text = generate_llm_content(prompt, sb)
         results = json.loads(strip_json_fence(text))
@@ -24,13 +72,20 @@ def process_news_batch(sb, items):
         for i, item in enumerate(items):
             if i < len(results):
                 res = results[i]
-                
+                relevance = float(res.get('relevance', 50))
+                # Recompute buzz_v2 using the merged entity list the LLM emitted.
+                merged = dict(item)
+                merged['entity_names'] = res.get('entities', item.get('entity_names', []))
+                buzz_v2 = compute_buzz_v2(merged, relevance)
+
                 sb.table('news_items').update({
                     'category': res.get('category', 'other'),
                     'entity_names': res.get('entities', item.get('entity_names', [])),
                     'sentiment': res.get('sentiment', item.get('sentiment', 0.0)),
                     'summary': res.get('summary', ''),
-                    'llm_processed': True
+                    'relevance': relevance,
+                    'buzz_v2': buzz_v2,
+                    'llm_processed': True,
                 }).eq('id', item['id']).execute()
                 
                 for entity in res.get('entities', []):

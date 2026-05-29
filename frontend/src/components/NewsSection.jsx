@@ -37,6 +37,9 @@ export default function NewsSection() {
     let query = supabase.from('news_items')
       .select('*')
       .gte('ingested_at', threeDaysAgo.toISOString())
+      // Phase 2.13: rank by LLM-rated composite buzz_v2 first (nulls last for
+      // not-yet-processed items), then fall back to recency for stability.
+      .order('buzz_v2', { ascending: false, nullsFirst: false })
       .order('ingested_at', { ascending: false })
       .range(pageNum * 20, (pageNum + 1) * 20 - 1);
     
