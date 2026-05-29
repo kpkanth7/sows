@@ -53,9 +53,11 @@ Fixes for failing actions + silent bugs. Highest value, lowest effort.
 Widen sources + use free quotas fully.
 
 - [x] **2.1** **DONE 2026-05-29.** Dedicated HN poller: `scripts/ingest_hackernews.py` (reuses dedup-aware `fetch_hn`) + `ingest_hackernews.yml` cron `*/20` 24/7. Repo made PUBLIC → unlimited Actions minutes (private 2000/mo couldn't afford it). Security-scanned history clean before flip.
-- [ ] **2.2** Add **GDELT 2.0** ingestor (free global news firehose, pre-computed sentiment + entities)
-- [ ] **2.3** Add **SEC EDGAR** 8-K/10-K ingestor (free, no key) → material events stream (mergers, lawsuits, exec changes)
-- [ ] **2.4** Add **arXiv** ingestor for AI paper releases (leading indicator)
+- [x] **2.2** **DONE 2026-05-29.** `scripts/ingest_gdelt.py` (DOC API ArtList, broad tech query, entity-filtered against ALL_COMPANIES, TextBlob sentiment, dedup-aware via save_news, 429 retry). New consolidated `ingest_firehoses.yml` hourly workflow (will also host 2.3 SEC + 2.4 arXiv). Live API verified (429 from local IP — handled gracefully).
+- [x] **2.3** **DONE 2026-05-29.** `scripts/ingest_sec.py` polls SEC "current filings" Atom feed for 8-K (material events), entity-matches against ALL_COMPANIES, saves at credibility tier 1 (regulatory). Wired into `ingest_firehoses.yml`. **⚠️ Requires new repo secret `SEC_USER_AGENT`** (SEC fair-access policy requires UA with contact email — 403 without). Format: `"AppName your-email@example.com"`. Set via `gh secret set SEC_USER_AGENT`. Script no-ops with warning if unset.
+- [x] **2.4** **DONE 2026-05-29.** `scripts/ingest_arxiv.py` pulls latest cs.AI/cs.LG/cs.CL/cs.CV/cs.RO submissions; entity-matches title+abstract; saves as source_type=research, tier 2. Wired into `ingest_firehoses.yml`. Live-tested: 100 entries fetched, 16/50 mentioned tracked companies.
+
+**Carry-forward bug surfaced 2026-05-29 (affects all news/papers sources):** Short generic-word company names (`Modal`, `Notion`, `Linear`, `Unity`, `Together`) false-positive via `extract_entities` word-boundary match — e.g. "tri-Modal-Dynamics" ≠ Modal Labs. Fix needs context-aware match (require "Inc"/"Labs"/sector co-mention OR multi-word canonical for ambiguous names) OR maintain a deny-list. → Phase 4 cleanup.
 - [ ] **2.5** Expand Finnhub usage (same key, more endpoints): `/calendar/earnings`, `/stock/insider-transactions`, `/stock/recommendation`, `/stock/upgrade-downgrade`, `/news-sentiment`
 - [ ] **2.6** Switch Reddit to RSS (`/r/X/.rss`) — unlimited, no 403s, drop 6s sleep
 - [ ] **2.7** Switch YouTube to `videos.list?id=A,B,C` batched (1 unit/50 vids vs 100 units/search) — 100× quota saving
