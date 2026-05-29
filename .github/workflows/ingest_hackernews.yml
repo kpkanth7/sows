@@ -1,0 +1,27 @@
+name: Ingest HackerNews (Every 20min)
+
+# HN Algolia is unlimited + real-time. Runs 24/7 (global tech news, no market hours).
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ingest_hackernews:
+    name: Poll HackerNews
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      PYTHONPATH: scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r scripts/requirements.txt
+      - name: Ingest HackerNews
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/ingest_hackernews.py

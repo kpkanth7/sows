@@ -52,7 +52,7 @@ Fixes for failing actions + silent bugs. Highest value, lowest effort.
 
 Widen sources + use free quotas fully.
 
-- [ ] **2.1** Add **HackerNews Algolia** ingestor, poll every 15-30min (unlimited, real-time, breaking software news lands here first)
+- [x] **2.1** **DONE 2026-05-29.** Dedicated HN poller: `scripts/ingest_hackernews.py` (reuses dedup-aware `fetch_hn`) + `ingest_hackernews.yml` cron `*/20` 24/7. Repo made PUBLIC → unlimited Actions minutes (private 2000/mo couldn't afford it). Security-scanned history clean before flip.
 - [ ] **2.2** Add **GDELT 2.0** ingestor (free global news firehose, pre-computed sentiment + entities)
 - [ ] **2.3** Add **SEC EDGAR** 8-K/10-K ingestor (free, no key) → material events stream (mergers, lawsuits, exec changes)
 - [ ] **2.4** Add **arXiv** ingestor for AI paper releases (leading indicator)
