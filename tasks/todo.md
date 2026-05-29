@@ -39,7 +39,7 @@ Fixes for failing actions + silent bugs. Highest value, lowest effort.
 - [x] **1.7** ~~Single source of truth for company synonyms~~ — STALE PREMISE: `COMPANY_SYNONYMS` lives only in `db.py`; `companies_config.py` has none. Nothing to dedup. No-op.
 - [x] **1.8** Added `pytest` + `tests/` (conftest puts scripts/ on path) — 5 critical-path tests: buzz calc, dedup (Jaccard+title_hash), entity extraction (name+synonym), quota check (fake client), LLM JSON-fence parse. Also extracted `strip_json_fence()` into `llm.py` (was dup'd 3×). **5/5 pass.**
 
-- [ ] **1.9** **90-day retention (news + stocks).** New `scripts/cleanup_old_data.py`: `DELETE FROM news_items WHERE ingested_at < now()-90d` + `DELETE FROM stock_snapshots WHERE captured_at < now()-90d`; record_health('cleanup'). Run daily — add a `cleanup` step to existing `supabase_keepalive.yml` (already scheduled) OR new daily cron. Keeps DB <100 MB permanently. App-side (not pg_cron) for health visibility. Decided 2026-05-29.
+- [x] **1.9** **90-day retention (news + stocks).** New `scripts/cleanup_old_data.py` prunes `news_items` (ingested_at) + `stock_snapshots` (captured_at) older than `RETENTION_DAYS=90`; records health. Wired as `continue-on-error` step in `supabase_keepalive.yml` (runs every 12h). Compile + import + YAML verified. Live delete NOT yet run (needs env). Note: `community_signals`/`influencer_signals` also grow — add to TARGETS later if needed.
 
 **Bugs found during Phase 1 (carry forward):**
 - 🐛 Forecast enum mismatch: LLM emits only `bullish|bearish|neutral` but `InvestorHub.jsx` queries `strong_bullish`/`high_risk` → those buckets always empty. → Phase 3.

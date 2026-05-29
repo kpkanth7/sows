@@ -31,3 +31,11 @@ jobs:
           result = sb.rpc('keepalive').execute()
           print('Supabase keepalive:', result.data)
           "
+
+      - name: Prune data older than 90 days
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONPATH: scripts
+        run: python scripts/cleanup_old_data.py
