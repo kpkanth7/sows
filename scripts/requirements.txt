@@ -13,4 +13,5 @@ python-dateutil==2.9.0
 textblob==0.18.0
 youtube-transcript-api==0.6.3
 python-dotenv
+pytest
 

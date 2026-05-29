@@ -43,6 +43,17 @@ def get_jaccard_similarity(words1: set, words2: set) -> float:
         return 0.0
     return len(words1 & words2) / len(words1 | words2)
 
+def compute_title_hash(title: str) -> str:
+    """MD5 of normalized, stop-word-stripped, sorted title words.
+
+    Catches case changes and word reordering as exact dups (cheap, indexed).
+    Falls back to a lowercased-title hash when normalization empties the set.
+    """
+    words = sorted(clean_title_words(title))
+    if not words:
+        return compute_hash((title or '').lower())
+    return hashlib.md5(' '.join(words).encode('utf-8')).hexdigest()
+
 def save_news(sb, item):
     try:
         url_hash = compute_hash(item['url'])
@@ -81,18 +92,25 @@ def save_news(sb, item):
                 }).eq('id', existing['id']).execute()
             return
             
-        # 2. Check if identical Title exists
-        res_title = sb.table('news_items').select('id').eq('title', item['title']).execute()
+        # 2. Check if identical (normalized) Title exists via indexed title_hash
+        title_hash = compute_title_hash(item['title'])
+        res_title = sb.table('news_items').select('id').eq('title_hash', title_hash).execute()
         if res_title.data:
             return
-            
-        # 3. Check for duplicate story via Jaccard similarity in the last 18 hours
+
+        # 3. Check for duplicate story via Jaccard similarity in the last 18 hours.
+        # Trigram RPC narrows candidates server-side (indexed); we apply the precise
+        # word-Jaccard cutoff on the small returned set instead of scanning all rows.
         item_words = clean_title_words(item['title'])
         if item_words:
             eighteen_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=18)).isoformat()
-            res_recent = sb.table('news_items').select('id, title, source_credibility_tier, hn_score, hn_comments, entity_names').gte('published_at', eighteen_hours_ago).execute()
-            
-            for recent in res_recent.data:
+            rpc_res = sb.rpc('match_similar_news', {
+                'p_title': item['title'],
+                'p_since': eighteen_hours_ago,
+                'p_threshold': 0.3
+            }).execute()
+
+            for recent in (rpc_res.data or []):
                 recent_entities = recent.get('entity_names', [])
                 item_entities = item.get('entity_names', [])
                 shared_entities = set(recent_entities) & set(item_entities)
@@ -134,6 +152,7 @@ def save_news(sb, item):
                     return
 
         item['url_hash'] = url_hash
+        item['title_hash'] = title_hash
         if 'llm_processed' not in item:
             item['llm_processed'] = False
         sb.table('news_items').insert(item).execute()

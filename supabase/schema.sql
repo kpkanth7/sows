@@ -131,6 +131,38 @@ CREATE INDEX IF NOT EXISTS idx_news_disputed ON news_items(is_disputed) WHERE is
 CREATE INDEX IF NOT EXISTS idx_news_entities ON news_items USING GIN(entity_names);
 CREATE INDEX IF NOT EXISTS idx_news_llm_unprocessed ON news_items(llm_processed) WHERE llm_processed = false;
 
+-- Trigram near-dup detection (replaces O(N^2) Python Jaccard scan).
+-- title_hash = MD5 of normalized, stop-word-stripped, sorted title words (exact-after-normalize dedup).
+-- GIN trigram index narrows near-dup candidates server-side; app does final Jaccard on the small candidate set.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS title_hash TEXT;
+CREATE INDEX IF NOT EXISTS idx_news_title_hash ON news_items(title_hash);
+CREATE INDEX IF NOT EXISTS idx_news_title_trgm ON news_items USING GIN (title gin_trgm_ops);
+
+-- Returns recent news whose title is trigram-similar to p_title (indexed, fast).
+-- p_threshold kept loose; the application applies the precise word-Jaccard cutoff on these candidates.
+CREATE OR REPLACE FUNCTION match_similar_news(
+    p_title TEXT,
+    p_since TIMESTAMPTZ,
+    p_threshold REAL DEFAULT 0.3
+)
+RETURNS TABLE (
+    id UUID,
+    title TEXT,
+    source_credibility_tier INT,
+    hn_score INT,
+    hn_comments INT,
+    entity_names JSONB
+)
+LANGUAGE sql STABLE AS $$
+    SELECT n.id, n.title, n.source_credibility_tier, n.hn_score, n.hn_comments, n.entity_names
+    FROM news_items n
+    WHERE n.published_at >= p_since
+      AND similarity(n.title, p_title) >= p_threshold
+    ORDER BY similarity(n.title, p_title) DESC
+    LIMIT 20;
+$$;
+
 -- ============================================================
 -- CLAIMS (for influencer trust tracking + dispute engine)
 -- ============================================================

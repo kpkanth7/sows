@@ -6,9 +6,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
-import google.generativeai as genai
-import httpx
 from db import get_client, check_quota, log_api_call, extract_entities
+from llm import generate_llm_content, strip_json_fence
 from companies_config import YOUTUBE_CHANNELS, ALL_COMPANIES
 from ingest_news import calc_buzz
 
@@ -17,64 +16,6 @@ logger = logging.getLogger(__name__)
 
 def compute_hash(url: str) -> str:
     return hashlib.md5(url.encode('utf-8')).hexdigest()
-
-def generate_llm_content(prompt: str, sb, max_tokens: int = None) -> str:
-    provider = os.environ.get('LLM_PROVIDER', 'gemini').lower()
-    model_name = os.environ.get('LLM_MODEL')
-    
-    if provider == 'groq':
-        api_key = os.environ.get('GROQ_API_KEY')
-        if not api_key:
-            provider = 'gemini'
-        else:
-            model = model_name or 'llama-3.3-70b-versatile'
-            try:
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2
-                }
-                if max_tokens:
-                    payload["max_tokens"] = max_tokens
-                resp = httpx.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=60)
-                resp.raise_for_status()
-                log_api_call(sb, 'gemini', 1)
-                return resp.json()['choices'][0]['message']['content']
-            except Exception as e:
-                logger.error(f"Groq API error: {e}, falling back to gemini")
-                provider = 'gemini'
-                
-    if provider == 'gemini':
-        api_key = os.environ.get('GEMINI_API_KEY')
-        if not api_key:
-            raise Exception("GEMINI_API_KEY not set")
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name or 'gemini-2.0-flash')
-        
-        max_retries = 5
-        backoff = 10
-        for attempt in range(max_retries):
-            try:
-                response = model.generate_content(prompt)
-                log_api_call(sb, 'gemini', 1)
-                return response.text
-            except Exception as e:
-                err_msg = str(e)
-                if '429' in err_msg or 'ResourceExhausted' in err_msg or 'Quota exceeded' in err_msg:
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Gemini API rate limit hit. Sleeping for {backoff}s before retry {attempt + 1}/{max_retries}...")
-                        time.sleep(backoff)
-                        backoff *= 2
-                    else:
-                        raise e
-                else:
-                    raise e
-    
-    raise Exception(f"Unsupported LLM provider: {provider}")
 
 def main():
     sb = get_client()
@@ -189,12 +130,7 @@ def main():
                         )
                         try:
                             resp_text = generate_llm_content(prompt, sb)
-                            if "```json" in resp_text:
-                                resp_text = resp_text.split("```json")[1].split("```")[0]
-                            elif "```" in resp_text:
-                                resp_text = resp_text.split("```")[1].split("```")[0]
-                                
-                            data = json.loads(resp_text.strip())
+                            data = json.loads(strip_json_fence(resp_text))
                             
                             if data.get('is_sponsored', False):
                                 logger.info(f"Skipping video {video_id} - detected as sponsored.")

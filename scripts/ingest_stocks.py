@@ -2,11 +2,13 @@ import os
 import time
 import argparse
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import finnhub
 import yfinance as yf
-from db import get_client, check_quota, log_api_call
-from companies_config import TIER1_COMPANIES, TIER2_COMPANIES, TIER3_COMPANIES
+from textblob import TextBlob
+from db import get_client, check_quota, log_api_call, extract_entities
+from companies_config import TIER1_COMPANIES, TIER2_COMPANIES, TIER3_COMPANIES, ALL_COMPANIES
+from ingest_news import save_news, calc_buzz
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -116,6 +118,34 @@ def main():
                     news = finnhub_client.company_news(ticker, _from=today, to=today)
                     log_api_call(sb, 'finnhub')
                     time.sleep(1.1)
+
+                    for article in (news or [])[:10]:
+                        headline = article.get('headline')
+                        link = article.get('url')
+                        if not headline or not link:
+                            continue
+                        entities = extract_entities(headline, ALL_COMPANIES)
+                        if name not in entities:
+                            entities.append(name)
+                        sentiment = TextBlob(headline).sentiment.polarity
+                        ts = article.get('datetime')
+                        published = (
+                            datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                            if ts else datetime.now(timezone.utc).isoformat()
+                        )
+                        save_news(sb, {
+                            'title': headline,
+                            'url': link,
+                            'source': 'finnhub',
+                            'source_type': 'news',
+                            'source_credibility_tier': 2,
+                            'entity_names': entities,
+                            'sentiment': sentiment,
+                            'buzz_score': calc_buzz(sentiment, entities),
+                            'summary': article.get('summary'),
+                            'image_url': article.get('image'),
+                            'published_at': published,
+                        })
                 except Exception as e:
                     logger.error(f"Finnhub news error for {ticker}: {e}")
                     
