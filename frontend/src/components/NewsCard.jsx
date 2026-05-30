@@ -1,4 +1,4 @@
-import { Clock, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, FileText } from 'lucide-react';
 import DisputePanel from './DisputePanel';
 
 function getTierClass(tier) {
@@ -48,9 +48,24 @@ export default function NewsCard({ item, isHero = false }) {
   return (
     <article className={`card glass-panel flex-col ${isHero ? 'news-hero' : ''}`} style={{ borderTop: `3px solid ${getCategoryColor(item.category)}` }}>
       <div className="flex justify-between items-center mb-4">
-        <span className={`badge ${getTierClass(item.source_credibility_tier)}`}>
-          {getTierLabel(item.source_credibility_tier)}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`badge ${getTierClass(item.source_credibility_tier)}`}>
+            {getTierLabel(item.source_credibility_tier)}
+          </span>
+          {/* Phase 3.1: explicit SEC 8-K badge so material filings stand out
+              even when listed inside All / category pills. */}
+          {item.source === 'sec_edgar' && (
+            <span className="badge badge-gold flex items-center gap-1">
+              <FileText size={10} /> SEC 8-K
+            </span>
+          )}
+          {/* Surprise-ticker tag: SEC 8-K with no tracked entity match — a
+              filing from outside our 120-company universe that hit the
+              tech-keyword whitelist. Flags it as "watch this one". */}
+          {item.source === 'sec_edgar' && (!item.entity_names || item.entity_names.length === 0) && (
+            <span className="badge badge-blue">NEW TICKER</span>
+          )}
+        </div>
         <div className="flex items-center gap-2 text-xs text-muted font-bold">
           <Clock size={12} />
           {timeAgo(item.published_at || item.ingested_at)}

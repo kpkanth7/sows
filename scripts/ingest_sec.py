@@ -28,6 +28,23 @@ logger = logging.getLogger(__name__)
 SEC_FEED = ("https://www.sec.gov/cgi-bin/browse-edgar"
             "?action=getcurrent&type=8-K&output=atom&count=100")
 
+# Phase 3.1: tech-keyword whitelist for "surprise tickers" — 8-Ks whose filer
+# isn't in our tracked 120 but whose title strongly suggests a tech company.
+# Tightens the firehose so we don't drown in mortgage trusts / small funds but
+# still catch sudden material events from tech cos we haven't added yet.
+# Word-boundary check is case-insensitive and applied to the 8-K title.
+TECH_KEYWORDS = (
+    'artificial intelligence', 'machine learning', 'semiconductor', 'fintech',
+    'saas', 'software', 'cybersecurity', 'cloud', 'blockchain', 'crypto',
+    'robotics', 'autonomous', 'quantum', 'neural', 'gpu', 'chip ', ' ai ',
+    ' ml ', ' llm ', 'data center', 'biotech', 'platform', 'technologies inc',
+)
+
+
+def _has_tech_keyword(title: str) -> bool:
+    t = f" {title.lower()} "
+    return any(kw in t for kw in TECH_KEYWORDS)
+
 
 def main():
     sb = get_client()
@@ -45,15 +62,23 @@ def main():
 
     feed = feedparser.parse(resp.content)
     matched = 0
+    surprise = 0
     for entry in feed.entries:
         title = entry.get("title", "")
         url = entry.get("link")
         if not title or not url:
             continue
         entities = extract_entities(title, ALL_COMPANIES)
-        if not entities:
+        # Phase 3.1: surprise-ticker path. If no tracked entity matched, still
+        # save the 8-K when the title contains a tech keyword (catches material
+        # events from cos we don't track yet). Otherwise drop to keep firehose
+        # noise (mortgage trusts, small funds) out of the DB.
+        if not entities and not _has_tech_keyword(title):
             continue
-        matched += 1
+        if entities:
+            matched += 1
+        else:
+            surprise += 1
         sentiment = TextBlob(title).sentiment.polarity
         published = entry.get("updated") or datetime.now(timezone.utc).isoformat()
         save_news(sb, {
@@ -63,12 +88,15 @@ def main():
             'source_type': 'news',
             'source_credibility_tier': 1,  # regulatory filing = highest credibility
             'category': 'ma',  # 8-K covers M&A + other material events
-            'entity_names': entities,
+            'entity_names': entities,  # empty list when surprise — UI can tag
             'sentiment': sentiment,
             'buzz_score': calc_buzz(sentiment, entities),
             'published_at': published,
         })
-    logger.info(f"SEC EDGAR: {len(feed.entries)} 8-K filings fetched, {matched} matched tracked companies.")
+    logger.info(
+        f"SEC EDGAR: {len(feed.entries)} 8-Ks fetched, "
+        f"{matched} matched tracked, {surprise} surprise tech tickers."
+    )
 
 
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ import CategoryPills from './CategoryPills';
 import NewsCard from './NewsCard';
 import { Activity } from 'lucide-react';
 
-const CATEGORIES = ['All', 'AI', 'Releases', 'M&A', 'IPO', 'Controversy', 'Conferences', 'Open Source', 'Earnings'];
+const CATEGORIES = ['All', 'AI', 'Releases', 'M&A', 'IPO', 'Controversy', 'Conferences', 'Open Source', 'Earnings', 'Filings'];
 
 const mapCategory = (uiCat) => {
   const map = {
@@ -19,6 +19,15 @@ const mapCategory = (uiCat) => {
     'Earnings': 'earnings'
   };
   return map[uiCat] || null;
+};
+
+// Phase 3.1: Filings pill filters by `source` (precise ingestor name) rather
+// than the LLM `category` — surfaces SEC 8-K material events (exec changes,
+// M&A, breaches, bankruptcies, etc.) as their own stream regardless of how
+// the LLM labeled the headline. Uses `source` not `source_type` because
+// `source_type` is a coarse bucket ('news'/'social'/'research').
+const SOURCE_FILTER = {
+  'Filings': 'sec_edgar',
 };
 
 export default function NewsSection() {
@@ -43,9 +52,14 @@ export default function NewsSection() {
       .order('ingested_at', { ascending: false })
       .range(pageNum * 20, (pageNum + 1) * 20 - 1);
     
-    const mappedCat = mapCategory(cat);
-    if (mappedCat) {
-      query = query.eq('category', mappedCat);
+    const sourceFilter = SOURCE_FILTER[cat];
+    if (sourceFilter) {
+      query = query.eq('source', sourceFilter);
+    } else {
+      const mappedCat = mapCategory(cat);
+      if (mappedCat) {
+        query = query.eq('category', mappedCat);
+      }
     }
     
     const { data, error } = await query;

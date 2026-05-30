@@ -98,7 +98,11 @@ Widen sources + use free quotas fully.
 
 The differentiators. This is what makes it "brilliant" not "another aggregator".
 
-- [ ] **3.1** **Material events stream** — SEC 8-Ks surfaced as feed cards ("$AAPL exec departure, 8-K filed 2h ago")
+- [x] **3.1** **Material events stream — DONE 2026-05-30.** Chose pill-inside-News over top-of-page strip (per user: "good info but not enough to be above News"). Changes:
+  - `NewsSection.jsx`: added `Filings` pill; new `SOURCE_FILTER` map branches the query to `.eq('source','sec_edgar')` instead of `.eq('category', …)`.
+  - `NewsCard.jsx`: gold `SEC 8-K` badge + `NEW TICKER` blue tag when SEC + no tracked entity match (surprise-ticker visual cue).
+  - `ingest_sec.py`: added tech-keyword whitelist (`TECH_KEYWORDS` + `_has_tech_keyword`) so unmatched 8-Ks still save when title contains AI/ML/cloud/chip/semi/SaaS/robotics/etc terms. Tracked-co 8-Ks always save; mortgage-trust/small-fund noise dropped.
+  - Tests still 5/5 green. Live verification deferred to next SEC ingest run (hourly cron).
 - [ ] **3.2** **Earnings countdown** widget per company + post-earnings sentiment delta
 - [ ] **3.3** **Real Hype-vs-Reality chart** — NPM/PyPI downloads + GitHub stars trendline vs news-volume trendline. Replace weak `entities*10+|sentiment|*20` with z-score vs 30-day baseline.
 - [ ] **3.4** **Insider trades panel** (Finnhub free)
