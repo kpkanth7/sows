@@ -109,7 +109,14 @@ The differentiators. This is what makes it "brilliant" not "another aggregator".
   - Wired into `supabase_keepalive.yml` (runs every 12h, continue-on-error). Also fixed prior latent bug: keepalive previously `pip install supabase` only, but `cleanup_old_data.py` imports `db.py` which needs `dotenv` etc → switched to `pip install -r scripts/requirements.txt`.
   - New `frontend/src/components/EarningsStrip.jsx`: 2-row strip (Upcoming Next 7d countdown · Past 7d sentiment delta chip + EPS beat/miss). Mounted in `NewsSection.jsx` only when activeCategory === 'Earnings'.
   - Verified: py_compile OK, 5/5 tests pass, frontend `npm run build` OK.
-- [ ] **3.3** **Real Hype-vs-Reality chart** — NPM/PyPI downloads + GitHub stars trendline vs news-volume trendline. Replace weak `entities*10+|sentiment|*20` with z-score vs 30-day baseline.
+- [x] **3.3** **Real Hype-vs-Reality chart — DONE 2026-05-30.** New `HypeRealityChart.jsx` renders a 30-day dual z-score trendline in `CompanyDetailPanel` Overview tab (below the legacy flat-bar `HypeRealityMeter`, kept for back-compat across CompanyCard/ComparisonWidget). Signals:
+  - Hype = daily count of `news_items` where `entity_names` contains the company name (last 30d).
+  - Reality = max `stars_this_week` from `github_signals` per day (last 30d).
+  - Each series z-scored vs its own 30-day mean+std so the lines share a common axis (`[-3, 3]`).
+  - Verdict chip computed from the last-7d avg of each z-series: > +1 diff → Overhyped, < -1 → Underrated/High Traction, else Balanced.
+  - Empty-state copy when both series are zero (new company / not enough history yet).
+  - **NPM/PyPI deferred to 3.3b** — not currently ingested. Carry forward as own ingestor + schema + `companies.npm_package`/`pypi_package` config fields.
+  - Verified: `npm run build` OK. Live verification deferred to next deploy.
 - [ ] **3.4** **Insider trades panel** (Finnhub free)
 - [ ] **3.5** **Controversy tracker** via CourtListener (free lawsuit API)
 - [ ] **3.6** **Patent + arXiv tracker** = forward-looking R&D signal

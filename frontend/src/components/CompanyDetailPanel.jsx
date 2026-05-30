@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { X, Github, ExternalLink, Activity } from 'lucide-react';
 import HypeRealityMeter from './HypeRealityMeter';
+import HypeRealityChart from './HypeRealityChart';
 import BenchmarkLeaderboard from './BenchmarkLeaderboard';
 
 export default function CompanyDetailPanel({ company, onClose }) {
@@ -57,6 +58,12 @@ export default function CompanyDetailPanel({ company, onClose }) {
             <div className="card glass-panel mt-4">
               <h3 className="flex items-center gap-2"><Activity size={18}/> Hype vs Reality</h3>
               <HypeRealityMeter hype={company.hype_score} reality={company.reality_score} />
+              {/* Phase 3.3: real 30-day z-score trendline below the legacy
+                  flat-bar meter. Two signals: news-volume (hype) vs
+                  github-stars-this-week (reality). */}
+              <div className="mt-4">
+                <HypeRealityChart company={company} />
+              </div>
             </div>
             
             {company.investor_brief && (
