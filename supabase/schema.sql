@@ -547,3 +547,20 @@ SELECT c.id, c.name, pc.current_tier, pc.last_news_volume_6h,
 FROM companies c
 JOIN company_poll_config pc ON pc.company_id = c.id
 WHERE pc.promotion_expires IS NULL OR pc.promotion_expires < NOW();
+
+-- ============================================================
+-- PHASE 3.7: DAILY INVESTOR DIGEST
+-- ============================================================
+-- One row per UTC date. Written by scripts/generate_daily_digest.py.
+-- summary = 1-paragraph LLM synthesis of last-24h top signals.
+CREATE TABLE IF NOT EXISTS daily_digests (
+    digest_date   DATE PRIMARY KEY,
+    summary       TEXT NOT NULL,
+    top_tickers   TEXT[] DEFAULT '{}',
+    source_count  INT DEFAULT 0,
+    generated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE daily_digests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "daily_digests public read" ON daily_digests;
+CREATE POLICY "daily_digests public read" ON daily_digests FOR SELECT USING (true);

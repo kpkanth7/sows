@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Navbar from "./components/Navbar";
 import LiveTicker from "./components/LiveTicker";
+import DailyDigestBanner from "./components/DailyDigestBanner";
 import NewsSection from "./components/NewsSection";
 import CompanyDashboard from "./components/CompanyDashboard";
 import InvestorHub from "./components/InvestorHub";
@@ -31,6 +32,8 @@ export default function App() {
       <LiveTicker />
       
       <main className="main-content" style={{ width: '100%', padding: 0, overflow: 'hidden' }}>
+        {/* Phase 3.7: persistent hero digest banner above every tab. */}
+        <DailyDigestBanner />
         <div className="tab-content" style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
           {activeTab === 'news' && <NewsSection />}
           
