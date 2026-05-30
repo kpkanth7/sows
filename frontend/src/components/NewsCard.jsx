@@ -1,4 +1,4 @@
-import { Clock, TrendingUp, AlertTriangle, FileText } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, FileText, Scale } from 'lucide-react';
 import DisputePanel from './DisputePanel';
 
 function getTierClass(tier) {
@@ -64,6 +64,12 @@ export default function NewsCard({ item, isHero = false }) {
               tech-keyword whitelist. Flags it as "watch this one". */}
           {item.source === 'sec_edgar' && (!item.entity_names || item.entity_names.length === 0) && (
             <span className="badge badge-blue">NEW TICKER</span>
+          )}
+          {/* Phase 3.5: CourtListener docket / lawsuit filing. */}
+          {item.source === 'courtlistener' && (
+            <span className="badge badge-danger flex items-center gap-1">
+              <Scale size={10} /> LAWSUIT
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted font-bold">
