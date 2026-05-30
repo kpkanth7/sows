@@ -6,7 +6,7 @@ import NewsCard from './NewsCard';
 import EarningsStrip from './EarningsStrip';
 import { Activity } from 'lucide-react';
 
-const CATEGORIES = ['All', 'AI', 'Releases', 'M&A', 'IPO', 'Controversy', 'Conferences', 'Open Source', 'Earnings', 'Filings'];
+const CATEGORIES = ['All', 'AI', 'Releases', 'M&A', 'IPO', 'Controversy', 'Conferences', 'Open Source', 'Earnings', 'Filings', 'Research'];
 
 const mapCategory = (uiCat) => {
   const map = {
@@ -29,6 +29,10 @@ const mapCategory = (uiCat) => {
 // `source_type` is a coarse bucket ('news'/'social'/'research').
 const SOURCE_FILTER = {
   'Filings': 'sec_edgar',
+  // Phase 3.6: Research pill surfaces arXiv papers (cs.AI/LG/CL/CV/RO).
+  // Patent ingest deferred — arXiv alone is the forward-looking R&D signal
+  // until a USPTO ingestor lands.
+  'Research': 'arxiv',
 };
 
 export default function NewsSection() {

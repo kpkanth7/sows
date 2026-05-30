@@ -1,4 +1,4 @@
-import { Clock, TrendingUp, AlertTriangle, FileText, Scale } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, FileText, Scale, BookOpen } from 'lucide-react';
 import DisputePanel from './DisputePanel';
 
 function getTierClass(tier) {
@@ -69,6 +69,12 @@ export default function NewsCard({ item, isHero = false }) {
           {item.source === 'courtlistener' && (
             <span className="badge badge-danger flex items-center gap-1">
               <Scale size={10} /> LAWSUIT
+            </span>
+          )}
+          {/* Phase 3.6: arXiv research paper (forward-looking R&D signal). */}
+          {item.source === 'arxiv' && (
+            <span className="badge badge-blue flex items-center gap-1">
+              <BookOpen size={10} /> arXiv
             </span>
           )}
         </div>
