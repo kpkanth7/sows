@@ -103,7 +103,12 @@ The differentiators. This is what makes it "brilliant" not "another aggregator".
   - `NewsCard.jsx`: gold `SEC 8-K` badge + `NEW TICKER` blue tag when SEC + no tracked entity match (surprise-ticker visual cue).
   - `ingest_sec.py`: added tech-keyword whitelist (`TECH_KEYWORDS` + `_has_tech_keyword`) so unmatched 8-Ks still save when title contains AI/ML/cloud/chip/semi/SaaS/robotics/etc terms. Tracked-co 8-Ks always save; mortgage-trust/small-fund noise dropped.
   - Tests still 5/5 green. Live verification deferred to next SEC ingest run (hourly cron).
-- [ ] **3.2** **Earnings countdown** widget per company + post-earnings sentiment delta
+- [x] **3.2** **Earnings countdown + sentiment delta — DONE 2026-05-30.** Surfaced inside existing `Earnings` pill in News & Signals (per user — reuses real estate rather than new dashboard section). Changes:
+  - Schema: `earnings_calendar` gained `sentiment_pre`, `sentiment_post`, `sentiment_delta` cols (idempotent `ADD COLUMN IF NOT EXISTS`). **⚠️ RE-RUN `supabase/schema.sql`**.
+  - New `scripts/compute_earnings_delta.py`: for each row whose T+7d window has closed (and delta IS NULL), computes avg news_items sentiment in [T-7,T-1] vs [T+1,T+7], writes pre/post/delta. Idempotent.
+  - Wired into `supabase_keepalive.yml` (runs every 12h, continue-on-error). Also fixed prior latent bug: keepalive previously `pip install supabase` only, but `cleanup_old_data.py` imports `db.py` which needs `dotenv` etc → switched to `pip install -r scripts/requirements.txt`.
+  - New `frontend/src/components/EarningsStrip.jsx`: 2-row strip (Upcoming Next 7d countdown · Past 7d sentiment delta chip + EPS beat/miss). Mounted in `NewsSection.jsx` only when activeCategory === 'Earnings'.
+  - Verified: py_compile OK, 5/5 tests pass, frontend `npm run build` OK.
 - [ ] **3.3** **Real Hype-vs-Reality chart** — NPM/PyPI downloads + GitHub stars trendline vs news-volume trendline. Replace weak `entities*10+|sentiment|*20` with z-score vs 30-day baseline.
 - [ ] **3.4** **Insider trades panel** (Finnhub free)
 - [ ] **3.5** **Controversy tracker** via CourtListener (free lawsuit API)

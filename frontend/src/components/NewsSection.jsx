@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { cache } from '../services/cache';
 import CategoryPills from './CategoryPills';
 import NewsCard from './NewsCard';
+import EarningsStrip from './EarningsStrip';
 import { Activity } from 'lucide-react';
 
 const CATEGORIES = ['All', 'AI', 'Releases', 'M&A', 'IPO', 'Controversy', 'Conferences', 'Open Source', 'Earnings', 'Filings'];
@@ -116,7 +117,11 @@ export default function NewsSection() {
       </div>
       
       <CategoryPills categories={CATEGORIES} activeCategory={activeCategory} onSelect={setActiveCategory} />
-      
+
+      {/* Phase 3.2: countdown + sentiment-delta strip only shown when the
+          Earnings pill is active. Keeps the rest of the feed untouched. */}
+      {activeCategory === 'Earnings' && <EarningsStrip />}
+
       {loading && news.length === 0 ? (
         <div className="grid-cols-2">
           <div className="skeleton skeleton-card" style={{ gridColumn: '1 / -1', height: '300px' }}></div>

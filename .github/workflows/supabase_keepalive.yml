@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-      - run: pip install supabase
+      - run: pip install -r scripts/requirements.txt
       - name: Ping Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -39,3 +39,13 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PYTHONPATH: scripts
         run: python scripts/cleanup_old_data.py
+
+      # Phase 3.2: compute post-earnings sentiment delta for any row whose
+      # T+7 window has closed. Idempotent — only fills rows where delta IS NULL.
+      - name: Compute post-earnings sentiment delta
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONPATH: scripts
+        run: python scripts/compute_earnings_delta.py

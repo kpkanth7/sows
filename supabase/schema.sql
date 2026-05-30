@@ -390,6 +390,15 @@ CREATE TABLE IF NOT EXISTS earnings_calendar (
 CREATE INDEX IF NOT EXISTS idx_earnings_date ON earnings_calendar(earnings_date);
 CREATE INDEX IF NOT EXISTS idx_earnings_company ON earnings_calendar(company_id);
 
+-- Phase 3.2: post-earnings sentiment delta. Backfilled by
+-- scripts/compute_earnings_delta.py for any row whose T+7 window has closed.
+-- sentiment_pre  = avg news_items.sentiment in [T-7d, T-1d]
+-- sentiment_post = avg news_items.sentiment in [T+1d, T+7d]
+-- sentiment_delta = post - pre (positive = narrative improved post-earnings)
+ALTER TABLE earnings_calendar ADD COLUMN IF NOT EXISTS sentiment_pre   NUMERIC;
+ALTER TABLE earnings_calendar ADD COLUMN IF NOT EXISTS sentiment_post  NUMERIC;
+ALTER TABLE earnings_calendar ADD COLUMN IF NOT EXISTS sentiment_delta NUMERIC;
+
 CREATE TABLE IF NOT EXISTS insider_transactions (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id          UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
