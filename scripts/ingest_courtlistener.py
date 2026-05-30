@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from textblob import TextBlob
 from db import get_client, record_health
-from companies_config import ALL_COMPANIES
+from companies_config import TIER1_COMPANIES, TIER2_COMPANIES, TIER3_COMPANIES
 from ingest_news import save_news, calc_buzz
 
 logging.basicConfig(level=logging.INFO)
@@ -34,8 +34,13 @@ REQ_SLEEP = 0.4  # ~150 req/min safely under the 5000/hr token cap
 
 
 def _public_tracked():
-    """Iterate only public tracked cos to keep the query loop small."""
-    for c in ALL_COMPANIES:
+    """Iterate only public tracked cos to keep the query loop small.
+
+    NOTE: `ALL_COMPANIES` from companies_config is a flat list of NAME STRINGS
+    (used elsewhere for fast entity matching). We need the original dicts to
+    filter by ticker, so we walk the tier lists directly.
+    """
+    for c in TIER1_COMPANIES + TIER2_COMPANIES + TIER3_COMPANIES:
         if c.get('ticker') and c.get('name'):
             yield c
 
