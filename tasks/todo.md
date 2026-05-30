@@ -117,7 +117,7 @@ The differentiators. This is what makes it "brilliant" not "another aggregator".
   - Empty-state copy when both series are zero (new company / not enough history yet).
   - **NPM/PyPI deferred to 3.3b** — not currently ingested. Carry forward as own ingestor + schema + `companies.npm_package`/`pypi_package` config fields.
   - Verified: `npm run build` OK. Live verification deferred to next deploy.
-- [ ] **3.4** **Insider trades panel** (Finnhub free)
+- [x] **3.4** **Insider trades panel — DONE 2026-05-30.** Single shared `InsiderTradesPanel.jsx` powers two placements: (a) global `Insider Trades` tab inside `InvestorHub` (no companyId prop → cross-co), (b) per-company `Insider` tab inside `CompanyDetailPanel` (passes `company.id`). Filter: `|change| ≥ 10,000` shares (notable only — hides routine grant noise). Window: last 30d. Buy/sell arrow + green/red color from sign of `change`. Empty state when no qualifying rows. Built off existing `insider_transactions` table from Phase 2.5 (Finnhub Form 4). Verified: `npm run build` OK.
 - [ ] **3.5** **Controversy tracker** via CourtListener (free lawsuit API)
 - [ ] **3.6** **Patent + arXiv tracker** = forward-looking R&D signal
 - [ ] **3.7** **Daily investor digest** — LLM writes 1-paragraph "what an investor should know" from all signals

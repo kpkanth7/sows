@@ -5,6 +5,7 @@ import { X, Github, ExternalLink, Activity } from 'lucide-react';
 import HypeRealityMeter from './HypeRealityMeter';
 import HypeRealityChart from './HypeRealityChart';
 import BenchmarkLeaderboard from './BenchmarkLeaderboard';
+import InsiderTradesPanel from './InsiderTradesPanel';
 
 export default function CompanyDetailPanel({ company, onClose }) {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -33,7 +34,7 @@ export default function CompanyDetailPanel({ company, onClose }) {
       </div>
       
       <div className="p-4 flex gap-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
-        {['Overview', 'Charts', 'Benchmarks', 'News'].map(tab => (
+        {['Overview', 'Charts', 'Benchmarks', 'Insider', 'News'].map(tab => (
           <button key={tab} className={`tab-button ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
             {tab}
           </button>
@@ -94,6 +95,11 @@ export default function CompanyDetailPanel({ company, onClose }) {
         
         {activeTab === 'Benchmarks' && (
           <BenchmarkLeaderboard companyId={company.id} />
+        )}
+
+        {/* Phase 3.4: per-company insider trades (last 30d, notable only). */}
+        {activeTab === 'Insider' && (
+          <InsiderTradesPanel companyId={company.id} />
         )}
         
         {activeTab === 'News' && (

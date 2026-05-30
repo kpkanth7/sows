@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { cache } from '../services/cache';
 import ForecastBadge from './ForecastBadge';
-import { Target, Users, AlertOctagon, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Target, Users, AlertOctagon, TrendingUp, ShieldCheck, DollarSign } from 'lucide-react';
+import InsiderTradesPanel from './InsiderTradesPanel';
 
 export default function InvestorHub() {
   const [activeTab, setActiveTab] = useState('forecasts'); // 'forecasts', 'influencers', 'disputes'
@@ -89,12 +90,20 @@ export default function InvestorHub() {
           >
             <Users size={16} /> Influencer Trust Index
           </button>
-          <button 
-            className={`tab-button ${activeTab === 'disputes' ? 'active' : ''}`} 
+          <button
+            className={`tab-button ${activeTab === 'disputes' ? 'active' : ''}`}
             onClick={() => setActiveTab('disputes')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <AlertOctagon size={16} /> Consensus & Disputes
+          </button>
+          {/* Phase 3.4: notable insider trades across all tracked cos last 30d. */}
+          <button
+            className={`tab-button ${activeTab === 'insider' ? 'active' : ''}`}
+            onClick={() => setActiveTab('insider')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <DollarSign size={16} /> Insider Trades
           </button>
         </div>
         
@@ -285,6 +294,16 @@ export default function InvestorHub() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* TAB 4: INSIDER TRADES (Phase 3.4) — notable last 30d, all cos. */}
+              {activeTab === 'insider' && (
+                <div>
+                  <p className="text-muted text-sm mb-6">
+                    Notable insider transactions (|change| ≥ 10K shares) across all tracked companies in the last 30 days. Source: SEC Form 4 filings via Finnhub.
+                  </p>
+                  <InsiderTradesPanel />
                 </div>
               )}
             </>
