@@ -564,3 +564,26 @@ CREATE TABLE IF NOT EXISTS daily_digests (
 ALTER TABLE daily_digests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "daily_digests public read" ON daily_digests;
 CREATE POLICY "daily_digests public read" ON daily_digests FOR SELECT USING (true);
+
+-- ============================================================
+-- PHASE 3.11: DARK-HORSE RADAR
+-- ============================================================
+-- Snapshot table. compute_dark_horses.py truncates + inserts top N each run.
+-- score = 0-100 composite of (gh stars z, news volume z, analyst momentum,
+-- insider+market combined). Components JSONB preserves per-signal breakdown
+-- so the UI can render a small radar/spark per row.
+CREATE TABLE IF NOT EXISTS dark_horse_movers (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id    UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    rank          INT NOT NULL,
+    score         NUMERIC(5,2) NOT NULL,
+    components    JSONB NOT NULL DEFAULT '{}',
+    reasons       TEXT[] DEFAULT '{}',
+    computed_at   TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_dh_rank ON dark_horse_movers(rank);
+CREATE INDEX IF NOT EXISTS idx_dh_company ON dark_horse_movers(company_id);
+
+ALTER TABLE dark_horse_movers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "dark_horse_movers public read" ON dark_horse_movers;
+CREATE POLICY "dark_horse_movers public read" ON dark_horse_movers FOR SELECT USING (true);
