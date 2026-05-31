@@ -11,3 +11,7 @@ __pycache__/
 # Local-only security assessment / threat model notes (never commit)
 SECURITY.md
 security.md
+
+# Local-only AI agent handoff notes (never commit)
+handoff.md
+HANDOFF.md

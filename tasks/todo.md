@@ -135,15 +135,56 @@ The differentiators. This is what makes it "brilliant" not "another aggregator".
 
 ---
 
-## Phase 4 — Polish & trust (ongoing)
+## Phase 4 — Polish, deploy & trust
 
-- [ ] **4.1** Sentry (frontend+backend) + Logtail/BetterStack on Actions — free tiers, get alerts
-- [ ] **4.2** `/status` page: every API's last-run + quota usage. Trust signal for visiting investors.
-- [ ] **4.3** React error boundaries + skeleton loaders
-- [ ] **4.4** Move inline styles → CSS modules / Tailwind
-- [ ] **4.5** SEO meta + OG cards per company page
-- [ ] **4.6** Mobile breakpoints
-- [ ] **4.7** Rewrite README to match reality (claims "40+ influencers, 100+ companies"; config has ~60 companies, single-digit influencer lists)
+**Time budget total: ~18–24h** focused work (≈4–6 evenings). Items grouped by gate.
+
+### Gate A — Ship (must do before share-able link, ~4–6h)
+
+- [ ] **4.0** **Vercel deploy** (~1h). Connect GH repo → root dir `frontend/`, framework Vite. Set env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (Production + Preview). Confirm Realtime websockets work on `*.vercel.app`. Add `frontend/.env.example` (committed, placeholder values). Smoke-test live URL.
+- [ ] **4.0b** **Schema re-run gate** (~15min). One-shot run of `supabase/schema.sql` in Supabase SQL Editor. Pending tables/cols from Phase 2–3: `region` col (2.12), `relevance`+`buzz_v2` cols (2.13), 4 Finnhub-extras tables (2.5), `title_hash`+`match_similar_news` RPC (1.6), `earnings_calendar` sentiment cols (3.2), `daily_digests` (3.7), `dark_horse_movers` (3.11). Idempotent — safe to re-run.
+- [ ] **4.0c** **Node20 deprecation pin** (~30min). Bump `actions/checkout@v4` → `@v4.2.0+` and `actions/setup-python@v5` → `@v5.2.0+` across all 10 workflow files. Deadline June 16, 2026. Verify all green after.
+- [ ] **4.0d** **Bundle/build sanity** (~30min). `npm run build` → check `dist/` size. Lazy-load Recharts on tabs that need it if >500KB gzipped. Confirm no `console.log` in production bundle.
+- [ ] **4.0e** **Vercel domain + robots** (~15min). Pick `*.vercel.app` subdomain (or attach custom). Add `frontend/public/robots.txt` (allow all, point to no sitemap yet). Set `<title>` + favicon in `index.html`.
+
+### Gate B — Trust (errors don't crash UI, you see breakage, ~5–7h)
+
+- [ ] **4.1** **Sentry** (~1.5h). Frontend (`@sentry/react`) + Python ingestors (`sentry-sdk`). Free tier 5K events/mo. Hook into Vercel + GH Actions secrets. Filter Realtime/network blips out. **Alert**: Slack/email webhook on `error` severity only.
+- [ ] **4.2** **`/status` page** (~2h). New `frontend/src/pages/Status.jsx`. Reads `health_checks` table (already populated by every job) — green/yellow/red dot per job + last-run timestamp + 24h success rate. Add quota_log row counts. Public-read (RLS already allows). Trust signal for share link.
+- [ ] **4.3** **Error boundaries + skeletons** (~1.5h). Wrap each top-level route + slide-over in `<ErrorBoundary>` (fall-through to one-line "tab failed, refresh"). Skeleton loaders on every section currently rendering `null` during fetch. No spinners.
+- [ ] **4.4** **URL scheme guard** (from SECURITY.md borderline, ~20min). One-line `safeUrl(u)` helper rejecting non-`http(s)`; wire into `NewsCard`, `MaterialEventsPanel`, `InvestorHub`, `ConferenceCalendar` anchor `href`s.
+
+### Gate C — Data quality (~3–4h)
+
+- [ ] **4.5** **Entity-match false-positive fix** (Phase 2 carry-forward, ~1.5h). `Modal`/`Notion`/`Linear`/`Unity`/`Together` falsely match common English words. Options: (a) require context co-mention (`Inc`/`Labs`/sector term within N tokens) for flagged-ambiguous names, OR (b) maintain a deny-list of short-name false-positive patterns. Pick (a). Add `companies.requires_context: bool` config flag.
+- [ ] **4.6** **`google.generativeai` → `google.genai`** (~45min). EOL package. Migrate import in `scripts/llm.py` `_call_gemini`. New SDK semantics differ slightly — diff against current call. Test against live Gemini quota.
+- [ ] **4.7** **DB nightly export** (~45min). New `scripts/export_snapshot.py` dumps each main table to gzipped CSV in repo `backups/YYYY-MM-DD/` via a workflow (gitignored or pushed to a separate backup repo). Free disaster recovery. **Decision needed**: where to store (S3 free tier vs GH artifacts vs separate private backup repo).
+
+### Gate D — Polish (UX delta, can ship live without, ~6–8h)
+
+- [ ] **4.8** **Mobile breakpoints** (~2h). Audit every component at 375px width. Treemap (3.10) needs a fallback list view <640px. Slide-over panels become full-screen modals.
+- [ ] **4.9** **Inline styles → Tailwind** (~2h). Codebase already mixes Tailwind classes + inline `style={{}}`. Migrate inline → Tailwind for consistency. Keep CSS vars (`--accent-green` etc) since they're theme-aware.
+- [ ] **4.10** **SEO + OG cards** (~1h). Per-company OG image deferred; static OG card on root + dynamic `<title>` per opened company OK. Add `<meta>` tags in `index.html` + `react-helmet-async` for per-route titles.
+- [ ] **4.11** **README rewrite** (~1h). Match reality: 120 companies (not 60 / "100+"), real influencer count, list every active workflow + cadence, link `/status` page, architecture diagram, no claims of features not yet shipped.
+- [ ] **4.12** **Lighthouse pass** (~30min). Target ≥90 perf, ≥95 a11y. Fix contrast/aria/alt issues surfaced.
+
+### Carry-forward (deferred, not blocking Phase 4 close)
+
+- **3.3b** NPM/PyPI download ingestor + extend HypeRealityChart Reality signal (~3h)
+- **3.6b** USPTO PatentsView ingestor + per-co R&D drill-down (~3h)
+- **2.6b** Reconsider Reddit→news_items promotion if RSS adds engagement metadata later
+
+### Phase 4 time estimate
+
+| Gate | Effort | Calendar (1–2h/evening) |
+|---|---|---|
+| A — Ship | 4–6h | 2–3 evenings |
+| B — Trust | 5–7h | 3 evenings |
+| C — Data quality | 3–4h | 2 evenings |
+| D — Polish | 6–8h | 3–4 evenings |
+| **Total** | **18–24h** | **~2 weeks** at 2h/day, **~4 days** focused full-time |
+
+Recommended order: A (deploy → real users possible) → B (errors visible → won't ship invisible breakage) → C (data clean) → D (cosmetic).
 
 ---
 
