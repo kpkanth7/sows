@@ -89,6 +89,49 @@ export default function NewsSection() {
     setPage(0);
   }, [activeCategory]);
 
+  // Phase 3.9: Supabase Realtime — subscribe to news_items INSERT and
+  // auto-prepend matching rows to the feed. Kills the need for polling /
+  // manual refresh; fresh signals appear at the top within seconds of ingest.
+  // Scope: news_items only (stocks/companies/digests still use their own
+  // refresh cadence). Re-subscribes on activeCategory change so the handler
+  // closure sees the current filter.
+  useEffect(() => {
+    const threeDaysAgoMs = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    const channel = supabase
+      .channel('news_inserts')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'news_items' },
+        (payload) => {
+          const row = payload.new;
+          if (!row) return;
+
+          // Filter match — mirror fetchNews's category/source logic.
+          const sourceFilter = SOURCE_FILTER[activeCategory];
+          if (sourceFilter) {
+            if (row.source !== sourceFilter) return;
+          } else {
+            const mappedCat = mapCategory(activeCategory);
+            if (mappedCat && row.category !== mappedCat) return;
+          }
+
+          // Defensive 3-day window check.
+          if (row.ingested_at && new Date(row.ingested_at).getTime() < threeDaysAgoMs) return;
+
+          // Dedup against current state.
+          setNews(prev => {
+            if (prev.some(n => n.id === row.id)) return prev;
+            return [row, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeCategory]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
