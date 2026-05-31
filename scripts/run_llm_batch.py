@@ -189,13 +189,16 @@ def update_company_briefs(sb):
 For EACH company provided, you must output a JSON object with its name as the key.
 For each company, provide:
 - "investor_brief": "2-sentence analysis based on the recent signals"
-- "forecast_direction": "bullish", "bearish", or "neutral"
+- "forecast_direction": EXACTLY one of: "strong_bullish", "bullish", "neutral", "bearish", "high_risk"
+  Use "strong_bullish" only when signals are uniformly positive AND highly material.
+  Use "high_risk" when controversy / lawsuits / governance issues dominate the signals.
+  Default to "neutral" if signals are mixed or thin.
 - "forecast_confidence": 0-100
 
 Return ONLY a valid JSON object where keys are the exact company names. Example:
 {
   "Google": { "investor_brief": "...", "forecast_direction": "bullish", "forecast_confidence": 85 },
-  "OpenAI": { "investor_brief": "...", "forecast_direction": "bullish", "forecast_confidence": 90 }
+  "OpenAI": { "investor_brief": "...", "forecast_direction": "strong_bullish", "forecast_confidence": 90 }
 }
 """
         

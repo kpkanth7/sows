@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { cache } from '../services/cache';
 import ForecastBadge from './ForecastBadge';
-import { Target, Users, AlertOctagon, TrendingUp, ShieldCheck, DollarSign } from 'lucide-react';
+import { Target, Users, AlertOctagon, TrendingUp, ShieldCheck, DollarSign, Rocket, FileText, Newspaper } from 'lucide-react';
 import InsiderTradesPanel from './InsiderTradesPanel';
+import DarkHorsePanel from './DarkHorsePanel';
+import MaterialEventsPanel from './MaterialEventsPanel';
+import DigestPanel from './DigestPanel';
 
 export default function InvestorHub() {
   const [activeTab, setActiveTab] = useState('forecasts'); // 'forecasts', 'influencers', 'disputes'
@@ -45,10 +48,13 @@ export default function InvestorHub() {
         .select('*')
         .order('trust_score', { ascending: false });
 
-      // 5. Fetch Disputes
+      // 5. Fetch Disputes — last 72h only (Phase 3.12 bug fix: label said
+      // "last 72 hours" but no time filter existed, so old disputes leaked.)
+      const since72h = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
       const { data: disputes } = await supabase.from('news_items')
         .select('id, title, url, source, dispute_claim_a, dispute_confidence_a, dispute_claim_b, dispute_confidence_b, dispute_brief')
         .eq('is_disputed', true)
+        .gte('ingested_at', since72h)
         .order('ingested_at', { ascending: false }).limit(10);
 
       const result = {
@@ -104,6 +110,28 @@ export default function InvestorHub() {
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <DollarSign size={16} /> Insider Trades
+          </button>
+          {/* Phase 3.12 new tabs: Dark-Horse (3.11) · Material Events (3.1) · Digest (3.7). */}
+          <button
+            className={`tab-button ${activeTab === 'darkhorse' ? 'active' : ''}`}
+            onClick={() => setActiveTab('darkhorse')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Rocket size={16} /> Dark-Horse
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'material' ? 'active' : ''}`}
+            onClick={() => setActiveTab('material')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <FileText size={16} /> Material Events
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'digest' ? 'active' : ''}`}
+            onClick={() => setActiveTab('digest')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Newspaper size={16} /> Daily Digest
           </button>
         </div>
         
@@ -306,6 +334,15 @@ export default function InvestorHub() {
                   <InsiderTradesPanel />
                 </div>
               )}
+
+              {/* TAB 5: DARK-HORSE MOVERS (Phase 3.11). */}
+              {activeTab === 'darkhorse' && <DarkHorsePanel />}
+
+              {/* TAB 6: MATERIAL EVENTS (Phase 3.1 dataset). */}
+              {activeTab === 'material' && <MaterialEventsPanel />}
+
+              {/* TAB 7: DAILY DIGEST (Phase 3.7 dataset). */}
+              {activeTab === 'digest' && <DigestPanel />}
             </>
           )}
         </div>
