@@ -6,6 +6,7 @@ import HypeRealityMeter from './HypeRealityMeter';
 import HypeRealityChart from './HypeRealityChart';
 import BenchmarkLeaderboard from './BenchmarkLeaderboard';
 import InsiderTradesPanel from './InsiderTradesPanel';
+import { safeUrl } from '../lib/urls';
 
 export default function CompanyDetailPanel({ company, onClose }) {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -52,7 +53,7 @@ export default function CompanyDetailPanel({ company, onClose }) {
               </div>
               <div className="card glass-panel">
                 <div className="text-xs text-muted font-bold">WEBSITE</div>
-                <div className="font-bold mt-1"><a href={company.website} target="_blank" className="flex items-center gap-1"><ExternalLink size={14}/> Visit</a></div>
+                <div className="font-bold mt-1"><a href={safeUrl(company.website)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1"><ExternalLink size={14}/> Visit</a></div>
               </div>
             </div>
             

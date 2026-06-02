@@ -1,5 +1,6 @@
 import { Clock, TrendingUp, AlertTriangle, FileText, Scale, BookOpen } from 'lucide-react';
 import DisputePanel from './DisputePanel';
+import { safeUrl } from '../lib/urls';
 
 function getTierClass(tier) {
   switch(tier) {
@@ -85,7 +86,7 @@ export default function NewsCard({ item, isHero = false }) {
       </div>
       
       <h3 style={{ fontSize: isHero ? '1.75rem' : '1.1rem', marginBottom: '0.5rem' }}>
-        <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a>
+        <a href={safeUrl(item.url)} target="_blank" rel="noopener noreferrer">{item.title}</a>
       </h3>
       
       <p className="text-muted text-sm mb-4" style={{ flex: 1 }}>{item.summary}</p>

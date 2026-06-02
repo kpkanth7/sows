@@ -83,8 +83,9 @@ def fetch_insider_transactions(sb, client, company_id: str, ticker: str):
     if not rows:
         return 0
     payload = []
+    seen = set()
     for r in rows[:25]:  # cap per company
-        payload.append({
+        row = {
             'company_id': company_id,
             'person': r.get('name'),
             'position': r.get('position'),
@@ -93,7 +94,12 @@ def fetch_insider_transactions(sb, client, company_id: str, ticker: str):
             'change': r.get('change'),
             'transaction_date': r.get('transactionDate'),
             'filing_date': r.get('filingDate'),
-        })
+        }
+        key = (row['company_id'], row['person'], row['transaction_date'], row['share'], row['change'])
+        if key in seen:
+            continue
+        seen.add(key)
+        payload.append(row)
     if payload:
         sb.table('insider_transactions').upsert(
             payload, on_conflict='company_id,person,transaction_date,share,change'
@@ -115,8 +121,9 @@ def fetch_recommendations(sb, client, company_id: str, ticker: str):
     if not data:
         return 0
     payload = []
+    seen = set()
     for r in data:
-        payload.append({
+        row = {
             'company_id': company_id,
             'period': r.get('period'),
             'strong_buy': r.get('strongBuy'),
@@ -124,7 +131,12 @@ def fetch_recommendations(sb, client, company_id: str, ticker: str):
             'hold': r.get('hold'),
             'sell': r.get('sell'),
             'strong_sell': r.get('strongSell'),
-        })
+        }
+        key = (row['company_id'], row['period'])
+        if key in seen:
+            continue
+        seen.add(key)
+        payload.append(row)
     if payload:
         sb.table('analyst_recommendations').upsert(payload, on_conflict='company_id,period').execute()
     return len(payload)
@@ -146,19 +158,25 @@ def fetch_upgrade_downgrade(sb, client, company_id: str, ticker: str):
     if not data:
         return 0
     payload = []
+    seen = set()
     for r in data:
         # Finnhub gradeTime is unix seconds
         ts = r.get('gradeTime')
         action_date = (datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
                        if ts else None)
-        payload.append({
+        row = {
             'company_id': company_id,
             'action': r.get('action'),
             'from_grade': r.get('fromGrade'),
             'to_grade': r.get('toGrade'),
             'firm': r.get('company'),
             'action_date': action_date,
-        })
+        }
+        key = (row['company_id'], row['firm'], row['action_date'], row['to_grade'])
+        if key in seen:
+            continue
+        seen.add(key)
+        payload.append(row)
     if payload:
         sb.table('upgrade_downgrade').upsert(
             payload, on_conflict='company_id,firm,action_date,to_grade'

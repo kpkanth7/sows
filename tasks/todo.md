@@ -143,16 +143,16 @@ The differentiators. This is what makes it "brilliant" not "another aggregator".
 
 - [ ] **4.0** **Vercel deploy** (~1h). Connect GH repo → root dir `frontend/`, framework Vite. Set env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (Production + Preview). Confirm Realtime websockets work on `*.vercel.app`. Add `frontend/.env.example` (committed, placeholder values). Smoke-test live URL.
 - [ ] **4.0b** **Schema re-run gate** (~15min). One-shot run of `supabase/schema.sql` in Supabase SQL Editor. Pending tables/cols from Phase 2–3: `region` col (2.12), `relevance`+`buzz_v2` cols (2.13), 4 Finnhub-extras tables (2.5), `title_hash`+`match_similar_news` RPC (1.6), `earnings_calendar` sentiment cols (3.2), `daily_digests` (3.7), `dark_horse_movers` (3.11). Idempotent — safe to re-run.
-- [ ] **4.0c** **Node20 deprecation pin** (~30min). Bump `actions/checkout@v4` → `@v4.2.0+` and `actions/setup-python@v5` → `@v5.2.0+` across all 10 workflow files. Deadline June 16, 2026. Verify all green after.
-- [ ] **4.0d** **Bundle/build sanity** (~30min). `npm run build` → check `dist/` size. Lazy-load Recharts on tabs that need it if >500KB gzipped. Confirm no `console.log` in production bundle.
-- [ ] **4.0e** **Vercel domain + robots** (~15min). Pick `*.vercel.app` subdomain (or attach custom). Add `frontend/public/robots.txt` (allow all, point to no sitemap yet). Set `<title>` + favicon in `index.html`.
+- [x] **4.0c** **Node20 deprecation pin** (~30min). Bumped all workflow `actions/checkout` + `actions/setup-python` uses to current Node24-backed `@v6` lines across all 10 workflow files. Verified no old `@v4`/`@v5` action refs remain.
+- [x] **4.0d** **Bundle/build sanity** (~30min). `npm run build` passes. Added Vite manual chunks (`charts`, `supabase`, `vendor`) so the production bundle no longer ships as one large JS chunk. Confirmed no frontend `console.log` refs.
+- [ ] **4.0e** **Vercel domain + robots** (~15min). Pick `*.vercel.app` subdomain (or attach custom). Added `frontend/public/robots.txt`, `frontend/public/favicon.svg`, generated `frontend/public/assets/tech-intel-signal-field.webp`, and basic root metadata/title/OG image in `index.html`; domain selection still pending operator action.
 
 ### Gate B — Trust (errors don't crash UI, you see breakage, ~5–7h)
 
 - [ ] **4.1** **Sentry** (~1.5h). Frontend (`@sentry/react`) + Python ingestors (`sentry-sdk`). Free tier 5K events/mo. Hook into Vercel + GH Actions secrets. Filter Realtime/network blips out. **Alert**: Slack/email webhook on `error` severity only.
 - [ ] **4.2** **`/status` page** (~2h). New `frontend/src/pages/Status.jsx`. Reads `health_checks` table (already populated by every job) — green/yellow/red dot per job + last-run timestamp + 24h success rate. Add quota_log row counts. Public-read (RLS already allows). Trust signal for share link.
 - [ ] **4.3** **Error boundaries + skeletons** (~1.5h). Wrap each top-level route + slide-over in `<ErrorBoundary>` (fall-through to one-line "tab failed, refresh"). Skeleton loaders on every section currently rendering `null` during fetch. No spinners.
-- [ ] **4.4** **URL scheme guard** (from SECURITY.md borderline, ~20min). One-line `safeUrl(u)` helper rejecting non-`http(s)`; wire into `NewsCard`, `MaterialEventsPanel`, `InvestorHub`, `ConferenceCalendar` anchor `href`s.
+- [x] **4.4** **URL scheme guard** (from SECURITY.md borderline, ~20min). Added shared `safeUrl(u)` helper rejecting non-`http(s)` and wired DB-backed anchors in `NewsCard`, `MaterialEventsPanel`, `InvestorHub`, `ConferenceCalendar`, and `CompanyDetailPanel`.
 
 ### Gate C — Data quality (~3–4h)
 

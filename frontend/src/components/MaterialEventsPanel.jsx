@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { FileText, ExternalLink } from 'lucide-react';
+import { safeUrl } from '../lib/urls';
 
 // Phase 3.12: Material Events (SEC 8-K) tab inside InvestorHub. Mirrors the
 // Filings pill in NewsSection but with an investor-centric layout — tracked
@@ -51,7 +52,7 @@ export default function MaterialEventsPanel() {
   const Card = ({ it, surprise = false }) => (
     <a
       key={it.id}
-      href={it.url}
+      href={safeUrl(it.url)}
       target="_blank"
       rel="noopener noreferrer"
       className="card glass-panel"

@@ -31,6 +31,9 @@ API_BASE = "https://www.courtlistener.com/api/rest/v4/search/"
 LOOKBACK_DAYS = 7
 PER_COMPANY_LIMIT = 5
 REQ_SLEEP = 0.4  # ~150 req/min safely under the 5000/hr token cap
+REQUEST_TIMEOUT = 8
+MAX_RUNTIME_SECONDS = 7 * 60
+UNAUTH_COMPANY_LIMIT = 20
 
 
 def _public_tracked():
@@ -46,18 +49,30 @@ def _public_tracked():
 
 
 def main():
+    started = time.monotonic()
     sb = get_client()
     token = os.environ.get('COURTLISTENER_API_TOKEN', '').strip()
     headers = {'Accept': 'application/json'}
     if token:
         headers['Authorization'] = f'Token {token}'
     else:
-        logger.warning("COURTLISTENER_API_TOKEN not set — using unauth (low quota).")
+        logger.warning(
+            "COURTLISTENER_API_TOKEN not set — using unauth low-quota mode "
+            f"and limiting this run to {UNAUTH_COMPANY_LIMIT} companies."
+        )
 
     since = (datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)).date().isoformat()
     saved = 0
     queried = 0
-    for comp in _public_tracked():
+    rate_limited = False
+    companies = list(_public_tracked())
+    if not token:
+        companies = companies[:UNAUTH_COMPANY_LIMIT]
+
+    for comp in companies:
+        if time.monotonic() - started > MAX_RUNTIME_SECONDS:
+            logger.warning("CourtListener time budget reached; ending partial run cleanly.")
+            break
         name = comp['name']
         params = {
             'q': f'"{name}"',
@@ -66,11 +81,11 @@ def main():
             'order_by': 'dateFiled desc',
         }
         try:
-            resp = httpx.get(API_BASE, params=params, headers=headers, timeout=20)
+            resp = httpx.get(API_BASE, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
             if resp.status_code == 429:
-                logger.warning("CourtListener 429 — backing off 30s")
-                time.sleep(30)
-                continue
+                logger.warning("CourtListener 429 — quota/rate limit reached; ending partial run cleanly.")
+                rate_limited = True
+                break
             resp.raise_for_status()
         except Exception as e:
             logger.warning(f"CourtListener fetch error for {name}: {e}")
@@ -105,7 +120,8 @@ def main():
             saved += 1
         time.sleep(REQ_SLEEP)
 
-    logger.info(f"CourtListener: queried {queried} companies, saved {saved} filings.")
+    status = "rate-limited" if rate_limited else "completed"
+    logger.info(f"CourtListener: {status}; queried {queried} companies, saved {saved} filings.")
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Calendar } from 'lucide-react';
+import { safeUrl } from '../lib/urls';
 
 export default function ConferenceCalendar() {
   const [events, setEvents] = useState([]);
@@ -38,7 +39,7 @@ export default function ConferenceCalendar() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: getTypeColor(ev.event_type) }}></div>
-                  <a href={ev.url} target="_blank" className="font-bold text-sm hover:underline">{ev.event_name}</a>
+                  <a href={safeUrl(ev.url)} target="_blank" rel="noopener noreferrer" className="font-bold text-sm hover:underline">{ev.event_name}</a>
                 </div>
                 <p className="text-xs text-muted m-0">{ev.description}</p>
                 {ev.company_names && ev.company_names.length > 0 && (

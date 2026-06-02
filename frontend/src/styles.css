@@ -139,6 +139,44 @@ button {
   border-radius: 12px;
 }
 
+.digest-banner {
+  position: relative;
+  isolation: isolate;
+  margin: 1rem auto 0;
+  max-width: 1400px;
+  min-height: 132px;
+  padding: 1rem 1.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 170, 0, 0.22);
+  border-left: 3px solid var(--accent-amber);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(10, 10, 15, 0.92) 0%, rgba(10, 10, 15, 0.78) 48%, rgba(10, 10, 15, 0.62) 100%),
+    image-set(url('/assets/tech-intel-signal-field.webp') type('image/webp'));
+  background-position: center;
+  background-size: cover;
+  box-shadow: var(--shadow-lg);
+}
+
+.digest-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(255, 170, 0, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 55%);
+  pointer-events: none;
+}
+
+[data-theme='light'] .digest-banner {
+  background:
+    linear-gradient(90deg, rgba(244, 244, 248, 0.94) 0%, rgba(244, 244, 248, 0.84) 48%, rgba(244, 244, 248, 0.72) 100%),
+    image-set(url('/assets/tech-intel-signal-field.webp') type('image/webp'));
+  background-position: center;
+  background-size: cover;
+}
+
 /* Navbar */
 .navbar {
   position: fixed;

@@ -7,6 +7,7 @@ import InsiderTradesPanel from './InsiderTradesPanel';
 import DarkHorsePanel from './DarkHorsePanel';
 import MaterialEventsPanel from './MaterialEventsPanel';
 import DigestPanel from './DigestPanel';
+import { safeUrl } from '../lib/urls';
 
 export default function InvestorHub() {
   const [activeTab, setActiveTab] = useState('forecasts'); // 'forecasts', 'influencers', 'disputes'
@@ -298,7 +299,7 @@ export default function InvestorHub() {
                       {data.disputes.map(disp => (
                         <div key={disp.id} className="card p-5" style={{ background: 'var(--bg-color)', borderLeft: '4px solid var(--accent-amber)' }}>
                           <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>
-                            <a href={disp.url} target="_blank" className="hover:underline flex items-center gap-2">
+                            <a href={safeUrl(disp.url)} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-2">
                               {disp.title}
                             </a>
                           </h3>

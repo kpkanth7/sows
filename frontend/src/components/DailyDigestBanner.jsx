@@ -32,13 +32,7 @@ export default function DailyDigestBanner() {
 
   return (
     <div
-      className="glass-panel"
-      style={{
-        margin: '1rem auto 0',
-        maxWidth: '1400px',
-        padding: '1rem 1.25rem',
-        borderLeft: '3px solid var(--accent-amber)',
-      }}
+      className="digest-banner"
     >
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
