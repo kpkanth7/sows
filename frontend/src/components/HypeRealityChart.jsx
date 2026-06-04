@@ -47,7 +47,7 @@ export default function HypeRealityChart({ company }) {
       const newsRes = await supabase
         .from('news_items')
         .select('ingested_at')
-        .contains('entity_names', [company.name])
+        .contains('entity_names', JSON.stringify([company.name]))
         .gte('ingested_at', start.toISOString());
 
       // 2) Reality — github_signals for company_id, taking max stars_this_week per day.
@@ -93,9 +93,9 @@ export default function HypeRealityChart({ company }) {
       const avgHype = last7.reduce((a, b) => a + b.hype, 0) / (last7.length || 1);
       const avgReality = last7.reduce((a, b) => a + b.reality, 0) / (last7.length || 1);
       let v;
-      if (avgHype - avgReality > 1) v = { label: 'Overhyped (last 7d)', color: 'var(--accent-amber)' };
-      else if (avgReality - avgHype > 1) v = { label: 'Underrated / High Traction (last 7d)', color: 'var(--accent-green)' };
-      else v = { label: 'Balanced (last 7d)', color: 'var(--text-secondary)' };
+      if (avgHype - avgReality > 1) v = { label: 'Overhyped (last 7d)', tone: 'is-amber' };
+      else if (avgReality - avgHype > 1) v = { label: 'Underrated / High Traction (last 7d)', tone: 'is-green' };
+      else v = { label: 'Balanced (last 7d)', tone: 'is-neutral' };
 
       setData(merged);
       setVerdict(v);
@@ -104,7 +104,7 @@ export default function HypeRealityChart({ company }) {
     run();
   }, [company]);
 
-  if (loading) return <div className="skeleton skeleton-card" style={{ height: '260px' }} />;
+  if (loading) return <div className="skeleton skeleton-card hype-reality-chart-skeleton" />;
 
   const hasData = data.some(d => d.hype !== 0 || d.reality !== 0);
   if (!hasData) {
@@ -117,10 +117,10 @@ export default function HypeRealityChart({ company }) {
 
   return (
     <div>
-      <div className="text-xs font-bold mb-2" style={{ color: verdict?.color }}>
+      <div className={`text-xs font-bold mb-2 hype-reality-chart-verdict ${verdict?.tone || 'is-neutral'}`}>
         {verdict?.label}
       </div>
-      <div style={{ width: '100%', height: 220 }}>
+      <div className="hype-reality-chart-frame">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -16 }}>
             <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} interval={4} />

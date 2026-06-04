@@ -23,7 +23,7 @@ export default function DigestPanel() {
     run();
   }, []);
 
-  if (loading) return <div className="skeleton skeleton-card" style={{ height: '300px' }} />;
+  if (loading) return <div className="skeleton skeleton-card digest-panel-skeleton" />;
   if (digests.length === 0) {
     return (
       <div className="empty-state">
@@ -41,20 +41,17 @@ export default function DigestPanel() {
         insider trades, and earnings signals.
       </p>
 
-      <div
-        className="card glass-panel mb-6"
-        style={{ padding: '1rem 1.25rem', borderLeft: '3px solid var(--accent-amber)' }}
-      >
+      <div className="card glass-panel mb-6 digest-panel-latest">
         <div className="flex items-center gap-2 mb-2">
           <Newspaper size={16} className="text-accent-amber" />
           <span className="font-bold text-sm">Today · {latest.digest_date}</span>
           <span className="text-xs text-muted">· {latest.source_count} signals</span>
         </div>
-        <p className="text-sm m-0" style={{ lineHeight: 1.5 }}>{latest.summary}</p>
+        <p className="text-sm m-0 digest-panel-summary">{latest.summary}</p>
         {(latest.top_tickers || []).length > 0 && (
           <div className="flex gap-2 flex-wrap mt-3">
             {latest.top_tickers.map(t => (
-              <span key={t} className="badge badge-gold" style={{ fontSize: '0.7rem' }}>{t}</span>
+              <span key={t} className="badge badge-gold digest-panel-top-ticker">{t}</span>
             ))}
           </div>
         )}
@@ -65,16 +62,16 @@ export default function DigestPanel() {
           <h4 className="text-xs text-muted font-bold mb-3">PAST 6 DAYS</h4>
           <div className="flex-col gap-3">
             {history.map(d => (
-              <div key={d.digest_date} className="card glass-panel" style={{ padding: '0.85rem 1rem' }}>
+              <div key={d.digest_date} className="card glass-panel digest-panel-history-card">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-muted font-bold">{d.digest_date}</span>
                   <span className="text-xs text-muted">{d.source_count} signals</span>
                 </div>
-                <p className="text-sm m-0" style={{ lineHeight: 1.5 }}>{d.summary}</p>
+                <p className="text-sm m-0 digest-panel-summary">{d.summary}</p>
                 {(d.top_tickers || []).length > 0 && (
                   <div className="flex gap-1 flex-wrap mt-2">
                     {d.top_tickers.map(t => (
-                      <span key={t} className="badge badge-gray" style={{ fontSize: '0.65rem' }}>{t}</span>
+                      <span key={t} className="badge badge-gray digest-panel-history-ticker">{t}</span>
                     ))}
                   </div>
                 )}

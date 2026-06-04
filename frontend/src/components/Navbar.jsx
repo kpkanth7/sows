@@ -11,7 +11,7 @@ export default function Navbar({ theme, toggleTheme, activeTab, setActiveTab }) 
   }, []);
 
   return (
-    <nav className={`navbar ${scrolled ? 'glass-panel' : ''}`} style={scrolled ? { top: '10px', width: 'calc(100% - 4rem)', left: '2rem', borderRadius: '12px', borderBottom: 'none' } : {}}>
+    <nav className={`navbar ${scrolled ? 'glass-panel navbar-scrolled' : ''}`}>
       <div className="nav-brand">
         Tech<span className="accent">Intel</span>
         <div className="live-indicator">
@@ -20,27 +20,38 @@ export default function Navbar({ theme, toggleTheme, activeTab, setActiveTab }) 
         </div>
       </div>
       
-      <div className="nav-links">
+      <div className="nav-links" role="tablist" aria-label="Primary views">
         <button 
           className={`nav-link tab-button ${activeTab === 'news' ? 'active' : ''}`} 
           onClick={() => setActiveTab('news')}
-          style={activeTab === 'news' ? { color: 'var(--accent-blue)', borderBottom: '2px solid var(--accent-blue)' } : {}}
+          role="tab"
+          aria-selected={activeTab === 'news'}
         >
           News & Signals
         </button>
         <button 
           className={`nav-link tab-button ${activeTab === 'companies' ? 'active' : ''}`} 
           onClick={() => setActiveTab('companies')}
-          style={activeTab === 'companies' ? { color: 'var(--accent-blue)', borderBottom: '2px solid var(--accent-blue)' } : {}}
+          role="tab"
+          aria-selected={activeTab === 'companies'}
         >
           Market Map
         </button>
         <button 
           className={`nav-link tab-button ${activeTab === 'investors' ? 'active' : ''}`} 
           onClick={() => setActiveTab('investors')}
-          style={activeTab === 'investors' ? { color: 'var(--accent-blue)', borderBottom: '2px solid var(--accent-blue)' } : {}}
+          role="tab"
+          aria-selected={activeTab === 'investors'}
         >
           Investor Hub
+        </button>
+        <button
+          className={`nav-link tab-button ${activeTab === 'status' ? 'active' : ''}`}
+          onClick={() => setActiveTab('status')}
+          role="tab"
+          aria-selected={activeTab === 'status'}
+        >
+          Status
         </button>
       </div>
 

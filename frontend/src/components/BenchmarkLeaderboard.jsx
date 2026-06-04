@@ -19,11 +19,11 @@ export default function BenchmarkLeaderboard({ companyId }) {
     fetchBench();
   }, [companyId]);
 
-  if (loading) return <div className="skeleton skeleton-card" style={{ height: '200px' }}></div>;
+  if (loading) return <div className="skeleton skeleton-card benchmark-leaderboard-skeleton"></div>;
   if (benchmarks.length === 0) return <div className="empty-state">No benchmarks recorded.</div>;
 
   return (
-    <div className="card glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+    <div className="card glass-panel benchmark-leaderboard-card">
       <div className="table-container">
         <table>
           <thead>
@@ -39,7 +39,7 @@ export default function BenchmarkLeaderboard({ companyId }) {
               <tr key={b.id} className={b.is_disputed ? 'disputed' : ''}>
                 <td className="font-bold">{b.model_name}</td>
                 <td>{b.benchmark_name}</td>
-                <td className="font-bold" style={{ color: 'var(--accent-blue)' }}>{b.score}{b.score_unit}</td>
+                <td className="font-bold benchmark-leaderboard-score">{b.score}{b.score_unit}</td>
                 <td>
                   {b.is_disputed ? (
                     <span className="badge badge-danger flex items-center gap-1" title={b.dispute_brief}>

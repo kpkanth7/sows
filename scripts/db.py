@@ -100,6 +100,37 @@ COMPANY_SYNONYMS = {
     'Anthropic': ['claude', 'claude-3', 'claude-3.5', 'claude-3.5-sonnet', 'sonnet']
 }
 
+AMBIGUOUS_ENTITY_CONTEXT = {
+    'Modal': [
+        'modal labs', 'modal.com', 'serverless', 'gpu', 'inference',
+        'cloud compute', 'ai infrastructure', 'container', 'compute platform',
+    ],
+    'Notion': [
+        'notion ai', 'notion.so', 'workspace', 'productivity', 'notes',
+        'docs', 'database', 'calendar', 'collaboration app',
+    ],
+    'Linear': [
+        'linear.app', 'issue tracker', 'project management', 'roadmap',
+        'sprint', 'bug tracking', 'engineering teams', 'software teams',
+    ],
+    'Unity': [
+        'unity software', 'unity technologies', 'game engine', 'runtime',
+        'developers', 'game developers', 'unity ads', '3d content',
+    ],
+    'Together AI': [
+        'together ai', 'together.ai', 'togethercomputer', 'open-model',
+        'open model', 'inference api', 'gpu cloud',
+    ],
+}
+
+
+def _has_ambiguous_entity_context(text_lower: str, entity: str) -> bool:
+    context_terms = AMBIGUOUS_ENTITY_CONTEXT.get(entity)
+    if not context_terms:
+        return True
+    return any(term in text_lower for term in context_terms)
+
+
 def extract_entities(text: str, known_entities: list) -> list:
     """Find company/tech mentions in text (case-insensitive)"""
     if not text:
@@ -112,6 +143,8 @@ def extract_entities(text: str, known_entities: list) -> list:
         # Match canonical name
         pattern = r'\b' + re.escape(entity.lower()) + r'\b'
         if re.search(pattern, text_lower):
+            if not _has_ambiguous_entity_context(text_lower, entity):
+                continue
             found.add(entity)
             continue
             

@@ -168,18 +168,30 @@ def update_company_briefs(sb):
         time_limit = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
         
         # Build one massive prompt for all companies
-        prompt = "You are a senior tech analyst. I will provide recent news and signals for multiple tech companies. Update the investor brief for EACH company.\n\n"
+        prompt = (
+            "You are a senior tech investor analyst. I will provide recent news and signals for multiple "
+            "tech companies. Update the investor brief for EACH company using only the supplied signals.\n"
+            "Write for an investor scanning risk, momentum, and what changed recently. Be concrete: mention "
+            "the most relevant signal(s), avoid generic growth language, and if evidence is thin say that "
+            "clearly instead of inventing conviction.\n\n"
+        )
         
         for comp in companies:
-            news_res = sb.table('news_items').select('title, summary, source_type').contains('entity_names', f'["{comp["name"]}"]').gte('ingested_at', time_limit).order('ingested_at', desc=True).limit(5).execute()
+            news_res = sb.table('news_items').select('title, summary, source_type, source, category, buzz_v2').contains('entity_names', f'["{comp["name"]}"]').gte('ingested_at', time_limit).order('ingested_at', desc=True).limit(5).execute()
             comm_res = sb.table('community_signals').select('post_title, sentiment').eq('entity_name', comp['name']).gte('captured_at', time_limit).order('captured_at', desc=True).limit(3).execute()
             inf_res = sb.table('influencer_signals').select('content_title').eq('entity_name', comp['name']).gte('published_at', time_limit).order('published_at', desc=True).limit(3).execute()
             
             prompt += f"--- COMPANY: {comp['name']} ---\n"
             prompt += f"Is Private: {comp.get('is_private', False)}\n"
+            if comp.get('last_valuation'):
+                prompt += f"Latest private valuation / market cap field: {comp.get('last_valuation')}\n"
             prompt += "RECENT SIGNALS:\n"
             for n in news_res.data:
-                prompt += f"- [NEWS] {n['title']} ({n['summary']})\n"
+                prompt += (
+                    f"- [NEWS:{n.get('source') or n.get('source_type') or 'unknown'}"
+                    f"/{n.get('category') or 'uncategorized'} buzz={n.get('buzz_v2')}] "
+                    f"{n['title']} ({n.get('summary') or 'No summary'})\n"
+                )
             for c in comm_res.data:
                 prompt += f"- [COMM] {c['post_title']} (sentiment: {c['sentiment']})\n"
             for i in inf_res.data:
@@ -188,7 +200,7 @@ def update_company_briefs(sb):
         prompt += """
 For EACH company provided, you must output a JSON object with its name as the key.
 For each company, provide:
-- "investor_brief": "2-sentence analysis based on the recent signals"
+- "investor_brief": "2 compact sentences based on the recent signals. Sentence 1 should state what changed or the strongest signal. Sentence 2 should state investor implication, risk, or confidence limit."
 - "forecast_direction": EXACTLY one of: "strong_bullish", "bullish", "neutral", "bearish", "high_risk"
   Use "strong_bullish" only when signals are uniformly positive AND highly material.
   Use "high_risk" when controversy / lawsuits / governance issues dominate the signals.

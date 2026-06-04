@@ -16,7 +16,6 @@ import os
 import logging
 import time
 import httpx
-import google.generativeai as genai
 from db import log_api_call
 
 logger = logging.getLogger(__name__)
@@ -97,13 +96,21 @@ def _call_gemini(prompt: str, sb, max_tokens: int = None) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set")
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(os.environ.get("LLM_MODEL") or "gemini-2.0-flash")
+    from google import genai
+
+    client = genai.Client(api_key=api_key)
+    llm_model = os.environ.get("LLM_MODEL", "")
+    model = os.environ.get("GEMINI_MODEL") or (
+        llm_model if llm_model.startswith("gemini") else "gemini-2.0-flash"
+    )
     max_retries = 5
     backoff = 10
     for attempt in range(max_retries):
         try:
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+            )
             log_api_call(sb, "gemini", 1)
             return response.text
         except Exception as e:

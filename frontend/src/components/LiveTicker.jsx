@@ -4,6 +4,7 @@ import { cache } from '../services/cache';
 
 export default function LiveTicker() {
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -12,6 +13,7 @@ export default function LiveTicker() {
       const cached = cache.get('ticker');
       if (cached) {
         if (mounted) setItems(cached);
+        if (mounted) setLoading(false);
         return;
       }
       
@@ -29,6 +31,7 @@ export default function LiveTicker() {
         if (mounted) setItems(data);
         cache.set('ticker', data, 5); // 5 min cache
       }
+      if (mounted) setLoading(false);
     }
     
     fetchTicker();
@@ -41,10 +44,24 @@ export default function LiveTicker() {
     };
   }, []);
 
-  if (items.length === 0) return null;
+  if (loading) {
+    return (
+      <div className="ticker-wrapper live-ticker-offset">
+        <div className="skeleton live-ticker-skeleton" />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="ticker-wrapper live-ticker-offset live-ticker-empty">
+        <span className="text-xs text-muted font-bold">Awaiting live signals</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="ticker-wrapper" style={{ marginTop: '70px' }}>
+    <div className="ticker-wrapper live-ticker-offset">
       <div className="ticker-track">
         {/* Duplicate items for seamless scroll */}
         {[...items, ...items, ...items].map((item, i) => (
@@ -52,7 +69,7 @@ export default function LiveTicker() {
             <span className="buzz">{(item.buzz_score || 0).toFixed(0)} BUZZ</span>
             <span>{item.title}</span>
             {item.entity_names && item.entity_names.length > 0 && (
-              <span className="text-muted text-xs" style={{ marginLeft: '8px' }}>
+              <span className="text-muted text-xs live-ticker-entities">
                 [{item.entity_names.join(', ')}]
               </span>
             )}

@@ -37,7 +37,7 @@ export default function MaterialEventsPanel() {
     run();
   }, []);
 
-  if (loading) return <div className="skeleton skeleton-card" style={{ height: '300px' }} />;
+  if (loading) return <div className="skeleton skeleton-card material-events-skeleton" />;
   if (items.length === 0) {
     return (
       <div className="empty-state">
@@ -55,11 +55,10 @@ export default function MaterialEventsPanel() {
       href={safeUrl(it.url)}
       target="_blank"
       rel="noopener noreferrer"
-      className="card glass-panel"
-      style={{ padding: '0.75rem 1rem', textDecoration: 'none', color: 'inherit' }}
+      className="card glass-panel material-events-card"
     >
       <div className="flex justify-between items-start gap-3">
-        <div style={{ flex: 1 }}>
+        <div className="material-events-copy">
           <div className="flex items-center gap-2 mb-1">
             <span className="badge badge-gold flex items-center gap-1">
               <FileText size={10} /> 8-K
@@ -70,9 +69,9 @@ export default function MaterialEventsPanel() {
             ))}
             <span className="text-xs text-muted">{timeAgo(it.published_at || it.ingested_at)}</span>
           </div>
-          <div className="text-sm font-bold" style={{ lineHeight: 1.4 }}>{it.title}</div>
+          <div className="text-sm font-bold material-events-title">{it.title}</div>
         </div>
-        <ExternalLink size={14} className="text-muted" style={{ marginTop: '0.2rem' }} />
+        <ExternalLink size={14} className="text-muted material-events-link-icon" />
       </div>
     </a>
   );

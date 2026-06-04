@@ -196,7 +196,13 @@ RSS_FEEDS = [
 ]
 
 REDDIT_SUBREDDITS = [
-    'technology', 'MachineLearning', 'programming', 'artificial', 'investing',
-    'singularity', 'LocalLLaMA', 'OpenAI', 'SaaS', 'devops',
-    'softwaredevelopment', 'tech', 'compsci', 'ClaudeAI', 'Anthropic'
+    'MachineLearning',
+    'singularity',
+    'LocalLLaMA',
+    'OpenAI',
+    'SaaS',
+    'devops',
+    'softwaredevelopment',
+    'ClaudeAI',
+    'Anthropic'
 ]

@@ -163,11 +163,30 @@ def _fallback_tickers(signals: dict):
     return [t for t, _ in counter.most_common(6)]
 
 
+def _parse_digest_response(text: str) -> dict:
+    """Parse strict JSON, fenced JSON, or a JSON object embedded after prose."""
+    cleaned = strip_json_fence(text)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        decoder = json.JSONDecoder()
+        for idx, ch in enumerate(cleaned):
+            if ch != '{':
+                continue
+            try:
+                obj, _ = decoder.raw_decode(cleaned[idx:])
+                if isinstance(obj, dict):
+                    return obj
+            except json.JSONDecodeError:
+                continue
+        raise
+
+
 def main():
     sb = get_client()
     if not check_quota(sb, 'gemini', 1):
         logger.warning("LLM quota exhausted — skipping digest.")
-        return
+        return {'status': 'partial', 'detail': 'LLM quota exhausted; digest skipped.'}
 
     signals = _fetch_signals(sb)
     source_count = (len(signals['news']) + len(signals['insider'])
@@ -175,18 +194,20 @@ def main():
                     + len(signals['recent_earn']))
     if source_count == 0:
         logger.warning("No signals in last 24h — skipping digest.")
-        return
+        return {'status': 'partial', 'detail': 'No signals found in the last 24h; digest skipped.'}
 
     prompt = _build_prompt(signals)
+    result = {'status': 'ok', 'detail': None}
     try:
         text = generate_llm_content(prompt, sb)
-        parsed = json.loads(strip_json_fence(text))
+        parsed = _parse_digest_response(text)
         summary = (parsed.get('summary') or '').strip()
         top = parsed.get('top_tickers') or _fallback_tickers(signals)
     except Exception as e:
         logger.warning(f"LLM parse failed ({e}) — saving prompt-only fallback.")
         summary = "Digest unavailable (LLM error). Top movers by signal frequency below."
         top = _fallback_tickers(signals)
+        result = {'status': 'partial', 'detail': f'LLM digest fallback used: {e}'[:500]}
 
     today = datetime.now(timezone.utc).date().isoformat()
     sb.table('daily_digests').upsert({
@@ -197,12 +218,13 @@ def main():
         'generated_at': datetime.now(timezone.utc).isoformat(),
     }, on_conflict='digest_date').execute()
     logger.info(f"Digest written for {today}: {source_count} signals, top_tickers={top[:8]}")
+    return result
 
 
 if __name__ == '__main__':
     try:
-        main()
-        record_health(get_client(), 'generate_daily_digest', 'ok')
+        result = main() or {'status': 'ok', 'detail': None}
+        record_health(get_client(), 'generate_daily_digest', result['status'], result.get('detail'))
     except Exception as e:
         record_health(get_client(), 'generate_daily_digest', 'error', str(e))
         raise

@@ -57,7 +57,7 @@ export default function InsiderTradesPanel({ companyId = null }) {
     run();
   }, [companyId]);
 
-  if (loading) return <div className="skeleton skeleton-card" style={{ height: '180px' }} />;
+  if (loading) return <div className="skeleton skeleton-card insider-trades-skeleton" />;
   if (rows.length === 0) {
     return (
       <div className="text-xs text-muted">
@@ -71,11 +71,10 @@ export default function InsiderTradesPanel({ companyId = null }) {
       {rows.map(r => {
         const isBuy = (r.change || 0) > 0;
         const Icon = isBuy ? ArrowUpRight : ArrowDownRight;
-        const color = isBuy ? 'var(--accent-green)' : 'var(--accent-red)';
         return (
-          <div key={r.id} className="card glass-panel flex items-center justify-between" style={{ padding: '0.6rem 0.75rem' }}>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="font-bold text-sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div key={r.id} className="card glass-panel flex items-center justify-between insider-trades-row">
+            <div className="insider-trades-meta">
+              <div className="font-bold text-sm insider-trades-person">
                 {r.person || 'Unknown'} {r.position ? <span className="text-muted text-xs">· {r.position}</span> : null}
               </div>
               <div className="text-xs text-muted">
@@ -83,7 +82,7 @@ export default function InsiderTradesPanel({ companyId = null }) {
                 {r.transaction_date} · {r.transaction_type || 'trade'}
               </div>
             </div>
-            <div className="flex items-center gap-1 font-bold text-sm" style={{ color }}>
+            <div className={`flex items-center gap-1 font-bold text-sm insider-trades-change ${isBuy ? 'is-buy' : 'is-sell'}`}>
               <Icon size={14} />
               {isBuy ? '+' : ''}{fmtShares(r.change)}
             </div>

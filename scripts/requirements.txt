@@ -3,7 +3,7 @@ httpx
 websockets
 feedparser
 atproto
-google-generativeai
+google-genai
 google-api-python-client==2.134.0
 finnhub-python==2.4.28
 yfinance>=0.2.54
@@ -14,4 +14,3 @@ textblob==0.18.0
 youtube-transcript-api==0.6.3
 python-dotenv
 pytest
-

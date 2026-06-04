@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
-from db import get_client, check_quota, log_api_call, extract_entities
+from db import get_client, check_quota, log_api_call, extract_entities, COMPANY_SYNONYMS
 from llm import generate_llm_content, strip_json_fence
 from companies_config import YOUTUBE_CHANNELS, ALL_COMPANIES
 from ingest_news import calc_buzz
@@ -14,8 +14,43 @@ from ingest_news import calc_buzz
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+CANONICAL_COMPANY_LOOKUP = {name.lower(): name for name in ALL_COMPANIES}
+for canonical, synonyms in COMPANY_SYNONYMS.items():
+    if canonical not in ALL_COMPANIES:
+        continue
+    for synonym in synonyms:
+        CANONICAL_COMPANY_LOOKUP.setdefault(str(synonym).strip().lower(), canonical)
+
 def compute_hash(url: str) -> str:
     return hashlib.md5(url.encode('utf-8')).hexdigest()
+
+
+def canonicalize_entities(values):
+    canonical = []
+    for value in values or []:
+        if not value:
+            continue
+        normalized = CANONICAL_COMPANY_LOOKUP.get(str(value).strip().lower())
+        if normalized and normalized not in canonical:
+            canonical.append(normalized)
+    return canonical
+
+
+def infer_youtube_category(channel_category: str, title: str, summary: str) -> str:
+    text = f"{title}\n{summary}".lower()
+    if any(term in text for term in ['ipo', 'public offering']):
+        return 'ipo'
+    if any(term in text for term in ['acquire', 'acquisition', 'merge', 'merger']):
+        return 'ma'
+    if any(term in text for term in ['launch', 'released', 'release', 'debut', 'announced', 'announcement']):
+        return 'release'
+    if any(term in text for term in ['lawsuit', 'controversy', 'scandal', 'fooling', 'deceiv', 'risk']):
+        return 'controversy'
+    if any(term in text for term in ['earnings', 'guidance', 'revenue', 'margin']):
+        return 'earnings'
+    if channel_category in {'ai_ml', 'dev'}:
+        return 'ai'
+    return 'other'
 
 def main():
     sb = get_client()
@@ -95,6 +130,7 @@ def main():
                     sentiment = 0.0
                     summary = ""
                     claims = []
+                    detected_category = infer_youtube_category(category, title, transcript_text[:280])
                     llm_processed_flag = False
                     
                     if transcript_text and check_quota(sb, 'gemini', 1):
@@ -126,20 +162,27 @@ def main():
                                 logger.info(f"Skipping video {video_id} - detected as sponsored.")
                                 continue
                                 
-                            entities = [e for e in data.get('entities', []) if e in ALL_COMPANIES]
-                            sentiment = data.get('sentiment', 0.0)
                             summary = data.get('summary', '')
+                            entities = canonicalize_entities(data.get('entities', []))
+                            extracted_entities = extract_entities(f"{title}\n{summary}\n{transcript_text}", ALL_COMPANIES)
+                            for entity in extracted_entities:
+                                if entity not in entities:
+                                    entities.append(entity)
+                            sentiment = data.get('sentiment', 0.0)
                             claims = data.get('claims', [])
+                            detected_category = infer_youtube_category(category, title, summary)
                             llm_processed_flag = True
                             
                         except Exception as e:
                             logger.error(f"Gemini parse error for video {video_id}: {e}")
-                            entities = extract_entities(title, ALL_COMPANIES)
+                            entities = extract_entities(f"{title}\n{transcript_text}", ALL_COMPANIES)
                             sentiment = 0.0
+                            detected_category = infer_youtube_category(category, title, transcript_text[:280])
                             llm_processed_flag = False
                     else:
-                        entities = extract_entities(title, ALL_COMPANIES)
+                        entities = extract_entities(f"{title}\n{transcript_text}", ALL_COMPANIES)
                         sentiment = 0.0
+                        detected_category = infer_youtube_category(category, title, transcript_text[:280])
                         llm_processed_flag = False
                     
                     if not entities:
@@ -167,6 +210,7 @@ def main():
                                     'entity_names': entities,
                                     'sentiment': sentiment,
                                     'buzz_score': calc_buzz(sentiment, entities),
+                                    'category': detected_category,
                                     'published_at': published_at.isoformat(),
                                     'llm_processed': llm_processed_flag,
                                     'dispute_checked': True
@@ -181,7 +225,7 @@ def main():
                     # Insert claims
                     for claim in claims:
                         try:
-                            entity = claim.get('entity')
+                            entity = CANONICAL_COMPANY_LOOKUP.get(str(claim.get('entity', '')).strip().lower())
                             text = claim.get('text')
                             ctype = claim.get('type', 'general')
                             if entity and text and entity in ALL_COMPANIES:

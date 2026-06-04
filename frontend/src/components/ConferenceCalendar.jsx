@@ -15,12 +15,12 @@ export default function ConferenceCalendar() {
 
   const getTypeColor = (type) => {
     const map = {
-      conference: 'var(--accent-blue)',
-      earnings: 'var(--accent-green)',
-      product_launch: 'var(--accent-amber)',
-      ipo: 'var(--accent-red)'
+      conference: 'is-conference',
+      earnings: 'is-earnings',
+      product_launch: 'is-product-launch',
+      ipo: 'is-ipo'
     };
-    return map[type] || 'var(--text-secondary)';
+    return map[type] || 'is-default';
   };
 
   return (
@@ -31,14 +31,14 @@ export default function ConferenceCalendar() {
       ) : (
         <div className="flex-col gap-4">
           {events.map(ev => (
-            <div key={ev.id} className="flex gap-4 items-start" style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div key={ev.id} className="conference-event-row">
               <div className="flex-col items-center min-w-[50px]">
                 <div className="text-xs text-muted font-bold uppercase">{new Date(ev.event_date).toLocaleString('default', { month: 'short' })}</div>
                 <div className="font-bold text-lg">{new Date(ev.event_date).getDate()}</div>
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: getTypeColor(ev.event_type) }}></div>
+                  <span className={`conference-event-dot ${getTypeColor(ev.event_type)}`}></span>
                   <a href={safeUrl(ev.url)} target="_blank" rel="noopener noreferrer" className="font-bold text-sm hover:underline">{ev.event_name}</a>
                 </div>
                 <p className="text-xs text-muted m-0">{ev.description}</p>

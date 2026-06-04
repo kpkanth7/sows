@@ -1,6 +1,6 @@
 import os
-import google.generativeai as genai
+from google import genai
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-for m in genai.list_models():
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+for m in client.models.list():
     print(m.name)

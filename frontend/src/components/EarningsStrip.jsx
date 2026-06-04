@@ -35,9 +35,9 @@ function DeltaChip({ delta }) {
   if (delta === null || delta === undefined) return null;
   const v = Number(delta);
   const Icon = v > 0.05 ? TrendingUp : v < -0.05 ? TrendingDown : Minus;
-  const color = v > 0.05 ? 'var(--accent-green)' : v < -0.05 ? 'var(--accent-red)' : 'var(--muted)';
+  const colorClass = v > 0.05 ? 'is-positive' : v < -0.05 ? 'is-negative' : 'is-neutral';
   return (
-    <span className="flex items-center gap-1 text-xs font-bold" style={{ color }}>
+    <span className={`flex items-center gap-1 text-xs font-bold earnings-delta-chip ${colorClass}`}>
       <Icon size={12} /> {v >= 0 ? '+' : ''}{v.toFixed(2)} Δ
     </span>
   );
@@ -82,22 +82,22 @@ export default function EarningsStrip() {
     run();
   }, []);
 
-  if (loading) return <div className="skeleton skeleton-card" style={{ height: '120px', marginBottom: '1.5rem' }} />;
+  if (loading) return <div className="skeleton skeleton-card earnings-strip-skeleton" />;
   if (upcoming.length === 0 && recent.length === 0) return null;
 
   return (
-    <div className="glass-panel" style={{ padding: '1rem', marginBottom: '1.5rem' }}>
+    <div className="glass-panel earnings-strip">
       {upcoming.length > 0 && (
         <>
           <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
             <Calendar size={14} /> Earnings — Next 7 Days
           </h3>
-          <div className="flex gap-3 overflow-x-auto pb-2" style={{ marginBottom: '1rem' }}>
+          <div className="flex gap-3 overflow-x-auto pb-2 earnings-strip-row">
             {upcoming.map(e => (
-              <div key={e.id} className="card glass-panel" style={{ minWidth: '180px', padding: '0.75rem' }}>
+              <div key={e.id} className="card glass-panel earnings-strip-card earnings-strip-card-upcoming">
                 <div className="font-bold text-base">{e.companies?.ticker || e.companies?.name}</div>
                 <div className="text-xs text-muted">{e.companies?.name}</div>
-                <div className="text-sm font-bold mt-2" style={{ color: 'var(--accent-amber)' }}>
+                <div className="text-sm font-bold mt-2 earnings-strip-countdown">
                   {fmtDaysAway(e.earnings_date)}
                 </div>
                 <div className="text-xs text-muted">
@@ -122,12 +122,12 @@ export default function EarningsStrip() {
               const beat = e.eps_actual != null && e.eps_estimate != null
                 ? Number(e.eps_actual) - Number(e.eps_estimate) : null;
               return (
-                <div key={e.id} className="card glass-panel" style={{ minWidth: '200px', padding: '0.75rem' }}>
+                <div key={e.id} className="card glass-panel earnings-strip-card earnings-strip-card-recent">
                   <div className="font-bold text-base">{e.companies?.ticker || e.companies?.name}</div>
                   <div className="text-xs text-muted">{e.companies?.name}</div>
                   <div className="text-xs text-muted mt-2">Reported {e.earnings_date}</div>
                   {beat !== null && (
-                    <div className="text-xs font-bold mt-1" style={{ color: beat >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                    <div className={`text-xs font-bold mt-1 earnings-strip-beat ${beat >= 0 ? 'is-positive' : 'is-negative'}`}>
                       EPS {beat >= 0 ? 'beat' : 'miss'} {Math.abs(beat).toFixed(2)}
                     </div>
                   )}

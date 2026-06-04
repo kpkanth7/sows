@@ -1,15 +1,75 @@
 import os
 import logging
+import json
 from datetime import datetime, timedelta, timezone
 import httpx
 from atproto import Client
-from db import get_client, extract_entities
+from db import get_client, extract_entities, check_quota, COMPANY_SYNONYMS
+from llm import generate_llm_content, strip_json_fence
 from companies_config import BLUESKY_ACCOUNTS, ALL_COMPANIES
 from textblob import TextBlob
 from ingest_news import calc_buzz, save_news
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+CANONICAL_COMPANY_LOOKUP = {name.lower(): name for name in ALL_COMPANIES}
+for canonical, synonyms in COMPANY_SYNONYMS.items():
+    if canonical not in ALL_COMPANIES:
+        continue
+    for synonym in synonyms:
+        CANONICAL_COMPANY_LOOKUP.setdefault(str(synonym).strip().lower(), canonical)
+
+
+def canonicalize_entities(values):
+    canonical = []
+    for value in values or []:
+        if not value:
+            continue
+        normalized = CANONICAL_COMPANY_LOOKUP.get(str(value).strip().lower())
+        if normalized and normalized not in canonical:
+            canonical.append(normalized)
+    return canonical
+
+
+def infer_bluesky_category(text: str) -> str:
+    text_lower = (text or "").lower()
+    if any(term in text_lower for term in ['ipo', 'public offering']):
+        return 'ipo'
+    if any(term in text_lower for term in ['acquire', 'acquisition', 'merge', 'merger']):
+        return 'ma'
+    if any(term in text_lower for term in ['launch', 'released', 'release', 'debut', 'announced', 'announcement', 'rollout']):
+        return 'release'
+    if any(term in text_lower for term in ['lawsuit', 'controversy', 'scandal', 'deceiv', 'fraud', 'risk']):
+        return 'controversy'
+    if any(term in text_lower for term in ['conference', 'keynote', 'wwdc', 'build ', 'google i/o', 'gdc']):
+        return 'conference'
+    if any(term in text_lower for term in ['earnings', 'guidance', 'revenue', 'margin']):
+        return 'earnings'
+    if any(term in text_lower for term in ['model', 'ai', 'agent', 'llm', 'inference', 'chip', 'gpu']):
+        return 'ai'
+    return 'other'
+
+
+def summarize_bluesky_post(text: str, sb) -> dict:
+    prompt = (
+        "Analyze this Bluesky post for a tech-investor signal.\n"
+        "Return ONLY valid JSON with keys: "
+        "\"title\" (8-14 word headline), "
+        "\"summary\" (1 concise sentence), "
+        "\"entities\" (tracked company names or products), "
+        "\"sentiment\" (-1.0 to 1.0), "
+        "\"category\" (ai/release/ma/ipo/controversy/conference/opensource/earnings/other).\n\n"
+        f"Post:\n{text}"
+    )
+    parsed = json.loads(strip_json_fence(generate_llm_content(prompt, sb)))
+    return {
+        'title': (parsed.get('title') or '').strip(),
+        'summary': (parsed.get('summary') or '').strip(),
+        'entities': canonicalize_entities(parsed.get('entities', [])),
+        'sentiment': float(parsed.get('sentiment', 0.0) or 0.0),
+        'category': parsed.get('category') or infer_bluesky_category(text),
+    }
 
 def resolve_handle_public(handle: str) -> str:
     if handle.startswith("did:"):
@@ -71,14 +131,36 @@ def main():
                         continue
                     post_url = f"https://bsky.app/profile/{handle}/post/{post.uri.split('/')[-1]}"
                     
-                    entities = extract_entities(text, ALL_COMPANIES)
+                    entities = []
+                    sentiment = TextBlob(text).sentiment.polarity
+                    summary = text
+                    title = f"Bluesky post by {handle}"
+                    category = infer_bluesky_category(text)
+                    llm_processed_flag = False
+
+                    if check_quota(sb, 'gemini', 1):
+                        try:
+                            enriched = summarize_bluesky_post(text, sb)
+                            title = enriched['title'] or title
+                            summary = enriched['summary'] or summary
+                            entities = enriched['entities']
+                            extracted_entities = extract_entities(text, ALL_COMPANIES)
+                            for entity in extracted_entities:
+                                if entity not in entities:
+                                    entities.append(entity)
+                            sentiment = enriched['sentiment']
+                            category = enriched['category']
+                            llm_processed_flag = True
+                        except Exception as e:
+                            logger.warning(f"Bluesky LLM enrichment failed for {handle}: {e}")
+                            entities = extract_entities(text, ALL_COMPANIES)
+                    else:
+                        entities = extract_entities(text, ALL_COMPANIES)
+
                     if entities:
-                        sentiment = TextBlob(text).sentiment.polarity
-                        
-                        # Save in news_items for main feed
                         news_item = {
-                            'title': f"Bluesky post by {handle}",
-                            'summary': text,
+                            'title': title,
+                            'summary': summary,
                             'url': post_url,
                             'source': handle,
                             'source_type': 'influencer',
@@ -86,8 +168,11 @@ def main():
                             'entity_names': entities,
                             'sentiment': sentiment,
                             'buzz_score': calc_buzz(sentiment, entities),
+                            'category': category,
                             'published_at': published_at.isoformat()
                         }
+                        if llm_processed_flag:
+                            news_item['llm_processed'] = True
                         save_news(sb, news_item)
                         
                         for entity in entities:

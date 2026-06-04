@@ -74,63 +74,70 @@ export default function InvestorHub() {
   }, [activeTab]);
 
   return (
-    <section id="investors" style={{ width: '100%', padding: '4rem 0' }}>
+    <section id="investors" className="investor-hub-section">
       <div className="section-header">
         <h2 className="section-title"><Target className="text-accent-red" /> Investor & Intelligence Hub</h2>
         <p className="text-muted">AI-synthesized forecasts, dispute resolution, and influencer tracking</p>
       </div>
 
-      <div className="card glass-panel p-0 overflow-hidden" style={{ width: '100%' }}>
+      <div className="card glass-panel p-0 overflow-hidden investor-hub-shell">
         {/* Main Tab Headers */}
-        <div className="tabs-header p-4 pb-0 mb-0 flex gap-6" style={{ borderBottom: '1px solid var(--border-color)' }}>
+        <div className="tabs-header p-4 pb-0 mb-0 flex gap-6 investor-hub-tabs" role="tablist" aria-label="Investor hub sections">
           <button 
-            className={`tab-button ${activeTab === 'forecasts' ? 'active' : ''}`} 
+            className={`tab-button investor-hub-tab ${activeTab === 'forecasts' ? 'active' : ''}`} 
             onClick={() => setActiveTab('forecasts')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            role="tab"
+            aria-selected={activeTab === 'forecasts'}
           >
             <TrendingUp size={16} /> Forecasts & Radar
           </button>
           <button 
-            className={`tab-button ${activeTab === 'influencers' ? 'active' : ''}`} 
+            className={`tab-button investor-hub-tab ${activeTab === 'influencers' ? 'active' : ''}`} 
             onClick={() => setActiveTab('influencers')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            role="tab"
+            aria-selected={activeTab === 'influencers'}
           >
             <Users size={16} /> Influencer Trust Index
           </button>
           <button
-            className={`tab-button ${activeTab === 'disputes' ? 'active' : ''}`}
+            className={`tab-button investor-hub-tab ${activeTab === 'disputes' ? 'active' : ''}`}
             onClick={() => setActiveTab('disputes')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            role="tab"
+            aria-selected={activeTab === 'disputes'}
           >
             <AlertOctagon size={16} /> Consensus & Disputes
           </button>
           {/* Phase 3.4: notable insider trades across all tracked cos last 30d. */}
           <button
-            className={`tab-button ${activeTab === 'insider' ? 'active' : ''}`}
+            className={`tab-button investor-hub-tab ${activeTab === 'insider' ? 'active' : ''}`}
             onClick={() => setActiveTab('insider')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            role="tab"
+            aria-selected={activeTab === 'insider'}
           >
             <DollarSign size={16} /> Insider Trades
           </button>
           {/* Phase 3.12 new tabs: Dark-Horse (3.11) · Material Events (3.1) · Digest (3.7). */}
           <button
-            className={`tab-button ${activeTab === 'darkhorse' ? 'active' : ''}`}
+            className={`tab-button investor-hub-tab ${activeTab === 'darkhorse' ? 'active' : ''}`}
             onClick={() => setActiveTab('darkhorse')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            role="tab"
+            aria-selected={activeTab === 'darkhorse'}
           >
             <Rocket size={16} /> Dark-Horse
           </button>
           <button
-            className={`tab-button ${activeTab === 'material' ? 'active' : ''}`}
+            className={`tab-button investor-hub-tab ${activeTab === 'material' ? 'active' : ''}`}
             onClick={() => setActiveTab('material')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            role="tab"
+            aria-selected={activeTab === 'material'}
           >
             <FileText size={16} /> Material Events
           </button>
           <button
-            className={`tab-button ${activeTab === 'digest' ? 'active' : ''}`}
+            className={`tab-button investor-hub-tab ${activeTab === 'digest' ? 'active' : ''}`}
             onClick={() => setActiveTab('digest')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            role="tab"
+            aria-selected={activeTab === 'digest'}
           >
             <Newspaper size={16} /> Daily Digest
           </button>
@@ -138,19 +145,21 @@ export default function InvestorHub() {
         
         <div className="p-6">
           {loading ? (
-            <div className="skeleton skeleton-card" style={{ height: '300px' }}></div>
+            <div className="skeleton skeleton-card investor-hub-skeleton"></div>
           ) : (
             <>
               {/* TAB 1: FORECASTS & RADAR */}
               {activeTab === 'forecasts' && (
                 <div>
                   {/* Sub-tabs */}
-                  <div className="category-pills mb-4">
+                  <div className="category-pills mb-4" role="tablist" aria-label="Forecast views">
                     {['Best Bets', 'Risk Radar', 'IPO Watch'].map(tab => (
                       <button 
                         key={tab} 
                         className={`pill ${forecastSubTab === tab ? 'active' : ''}`} 
                         onClick={() => setForecastSubTab(tab)}
+                        role="tab"
+                        aria-selected={forecastSubTab === tab}
                       >
                         {tab}
                       </button>
@@ -164,16 +173,16 @@ export default function InvestorHub() {
                       ) : (
                         <div className="grid-cols-2">
                           {data.bestBets.map(item => (
-                            <div key={item.id} className="card p-4" style={{ background: 'var(--bg-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div key={item.id} className="card p-4 investor-hub-forecast-card">
                               <div>
                                 <div className="flex justify-between items-start mb-2">
                                   <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{item.name}</h3>
+                                    <h3 className="investor-hub-card-title">{item.name}</h3>
                                     <span className="text-xs text-muted font-bold">{item.ticker || 'PRIVATE'}</span>
                                   </div>
                                   <ForecastBadge direction={item.forecast_direction} confidence={item.forecast_confidence} />
                                 </div>
-                                <p className="text-sm text-muted" style={{ lineBreak: 'anywhere' }}>{item.investor_brief}</p>
+                                <p className="text-sm text-muted investor-hub-brief-anywhere">{item.investor_brief}</p>
                               </div>
                             </div>
                           ))}
@@ -187,17 +196,17 @@ export default function InvestorHub() {
                       ) : (
                         <div className="grid-cols-2">
                           {data.risks.map(item => (
-                            <div key={item.id} className="card p-4" style={{ background: 'var(--bg-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div key={item.id} className="card p-4 investor-hub-forecast-card">
                               <div>
                                 <div className="flex justify-between items-start mb-2">
                                   <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{item.name}</h3>
+                                    <h3 className="investor-hub-card-title">{item.name}</h3>
                                     <span className="text-xs text-muted font-bold">{item.ticker || 'PRIVATE'}</span>
                                   </div>
                                   <ForecastBadge direction={item.forecast_direction} confidence={item.forecast_confidence} />
                                 </div>
                                 {item.controversy_score > 50 && (
-                                  <div className="badge badge-danger mb-2" style={{ fontSize: '0.7rem' }}>CONTROVERSY SCORE: {Math.round(item.controversy_score)}/100</div>
+                                  <div className="badge badge-danger mb-2 investor-hub-controversy-badge">CONTROVERSY SCORE: {Math.round(item.controversy_score)}/100</div>
                                 )}
                                 <p className="text-sm text-muted">{item.investor_brief}</p>
                               </div>
@@ -213,17 +222,17 @@ export default function InvestorHub() {
                       ) : (
                         <div className="grid-cols-2">
                           {data.ipos.map(item => (
-                            <div key={item.id} className="card p-4" style={{ background: 'var(--bg-color)' }}>
+                            <div key={item.id} className="card p-4 investor-hub-ipo-card">
                               <div className="flex justify-between items-start mb-2">
                                 <div>
-                                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{item.name}</h3>
+                                  <h3 className="investor-hub-card-title">{item.name}</h3>
                                   <span className="badge badge-blue text-xs mt-1">{item.sector}</span>
                                 </div>
-                                <div style={{ textAlign: 'right' }}>
-                                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-green)' }}>
+                                <div className="investor-hub-ipo-metric">
+                                  <div className="investor-hub-ipo-value">
                                     ${(item.last_valuation / 1e9).toFixed(1)}B
                                   </div>
-                                  <div className="text-muted" style={{ fontSize: '0.65rem', fontWeight: 'bold' }}>{item.valuation_source}</div>
+                                  <div className="text-muted investor-hub-ipo-source">{item.valuation_source}</div>
                                 </div>
                               </div>
                               <p className="text-sm text-muted mt-2">{item.investor_brief || "Tracking private market signaling and funding events."}</p>
@@ -260,9 +269,9 @@ export default function InvestorHub() {
                             <tr key={inf.id}>
                               <td className="font-bold">{inf.name}</td>
                               <td>
-                                <span className="badge badge-gray" style={{ textTransform: 'uppercase' }}>{inf.platform}</span>
+                                <span className="badge badge-gray investor-hub-platform-badge">{inf.platform}</span>
                               </td>
-                              <td className="font-bold" style={{ color: inf.trust_score > 0.4 ? 'var(--accent-green)' : inf.trust_score > 0.2 ? 'var(--accent-amber)' : 'var(--accent-red)' }}>
+                              <td className={`font-bold investor-hub-trust-value ${inf.trust_score > 0.4 ? 'is-high' : inf.trust_score > 0.2 ? 'is-mid' : 'is-low'}`}>
                                 {parseFloat(inf.trust_score).toFixed(3)}
                               </td>
                               <td className="font-bold">{accuracy} ({inf.correct_claims}/{inf.total_claims})</td>
@@ -297,27 +306,27 @@ export default function InvestorHub() {
                   ) : (
                     <div className="flex-col gap-6">
                       {data.disputes.map(disp => (
-                        <div key={disp.id} className="card p-5" style={{ background: 'var(--bg-color)', borderLeft: '4px solid var(--accent-amber)' }}>
-                          <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>
+                        <div key={disp.id} className="card p-5 investor-hub-dispute-card">
+                          <h3 className="investor-hub-card-title investor-hub-dispute-title">
                             <a href={safeUrl(disp.url)} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-2">
                               {disp.title}
                             </a>
                           </h3>
-                          <div className="grid-cols-2 mb-4" style={{ gap: '1rem' }}>
-                            <div className="p-3 rounded" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
-                              <span className="badge badge-gray mb-1" style={{ fontSize: '0.65rem' }}>Source Claim A</span>
-                              <p className="text-sm font-bold m-0" style={{ color: 'var(--text-primary)' }}>"{disp.dispute_claim_a}"</p>
-                              <div className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>Confidence Weight: {disp.dispute_confidence_a}%</div>
+                          <div className="grid-cols-2 mb-4 investor-hub-dispute-grid">
+                            <div className="p-3 rounded investor-hub-dispute-claim">
+                              <span className="badge badge-gray mb-1 investor-hub-dispute-label">Source Claim A</span>
+                              <p className="text-sm font-bold m-0 investor-hub-dispute-text">"{disp.dispute_claim_a}"</p>
+                              <div className="text-muted mt-2 investor-hub-dispute-confidence">Confidence Weight: {disp.dispute_confidence_a}%</div>
                             </div>
-                            <div className="p-3 rounded" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
-                              <span className="badge badge-gray mb-1" style={{ fontSize: '0.65rem' }}>Source Claim B</span>
-                              <p className="text-sm font-bold m-0" style={{ color: 'var(--text-primary)' }}>"{disp.dispute_claim_b}"</p>
-                              <div className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>Confidence Weight: {disp.dispute_confidence_b}%</div>
+                            <div className="p-3 rounded investor-hub-dispute-claim">
+                              <span className="badge badge-gray mb-1 investor-hub-dispute-label">Source Claim B</span>
+                              <p className="text-sm font-bold m-0 investor-hub-dispute-text">"{disp.dispute_claim_b}"</p>
+                              <div className="text-muted mt-2 investor-hub-dispute-confidence">Confidence Weight: {disp.dispute_confidence_b}%</div>
                             </div>
                           </div>
                           <div className="dispute-panel mt-3">
                             <span className="text-xs text-accent-amber font-bold flex items-center gap-1"><ShieldCheck size={14}/> AI CONSENSUS RESOLUTION BRIEF:</span>
-                            <p className="dispute-brief m-0" style={{ fontSize: '0.9rem', lineHeight: '1.4' }}>{disp.dispute_brief}</p>
+                            <p className="dispute-brief m-0 investor-hub-dispute-brief">{disp.dispute_brief}</p>
                           </div>
                         </div>
                       ))}

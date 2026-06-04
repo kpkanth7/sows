@@ -1,8 +1,15 @@
-import { Clock, TrendingUp, AlertTriangle, FileText, Scale, BookOpen } from 'lucide-react';
+import { Clock, TrendingUp, AlertTriangle, FileText, Scale, BookOpen, Mic2 } from 'lucide-react';
 import DisputePanel from './DisputePanel';
 import { safeUrl } from '../lib/urls';
+import ProgressBar from './ProgressBar';
 
-function getTierClass(tier) {
+function isSocialCommunityItem(item) {
+  return item?.category === 'social' || String(item?.source || '').startsWith('r/');
+}
+
+function getTierClass(tier, item) {
+  if (item?.source_type === 'influencer') return 'badge-blue';
+  if (isSocialCommunityItem(item)) return 'badge-danger';
   switch(tier) {
     case 1: return 'badge-gold';
     case 2: return 'badge-blue';
@@ -12,7 +19,9 @@ function getTierClass(tier) {
   }
 }
 
-function getTierLabel(tier) {
+function getTierLabel(tier, item) {
+  if (item?.source_type === 'influencer') return 'Creator Insight';
+  if (isSocialCommunityItem(item)) return 'Community Signal';
   switch(tier) {
     case 1: return 'Tier 1 (Official)';
     case 2: return 'Tier 2 (High Trust)';
@@ -24,14 +33,15 @@ function getTierLabel(tier) {
 
 function getCategoryColor(cat) {
   const map = {
-    ai: 'var(--accent-blue)',
-    release: 'var(--accent-green)',
-    ma: 'var(--accent-amber)',
-    ipo: 'var(--accent-amber)',
-    controversy: 'var(--accent-red)',
-    conference: 'var(--accent-blue)'
+    ai: 'news-card-category-ai',
+    release: 'news-card-category-release',
+    ma: 'news-card-category-ma',
+    ipo: 'news-card-category-ipo',
+    controversy: 'news-card-category-controversy',
+    conference: 'news-card-category-conference',
+    social: 'news-card-category-social'
   };
-  return map[cat] || 'var(--border-color)';
+  return map[cat] || 'news-card-category-default';
 }
 
 export default function NewsCard({ item, isHero = false }) {
@@ -45,14 +55,24 @@ export default function NewsCard({ item, isHero = false }) {
   };
 
   const sentimentColor = item.sentiment > 0.2 ? 'green' : item.sentiment < -0.2 ? 'red' : 'gray';
+  const displayBuzz = item.buzz_v2 ?? item.buzz_score ?? 0;
+  const categoryColor = getCategoryColor(item.category);
+  const sentimentValue = Math.max(10, Math.min(100, (item.sentiment + 1) * 50));
 
   return (
-    <article className={`card glass-panel flex-col ${isHero ? 'news-hero' : ''}`} style={{ borderTop: `3px solid ${getCategoryColor(item.category)}` }}>
+    <article className={`card glass-panel flex-col news-card ${categoryColor} ${isHero ? 'news-hero' : ''}`}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
-          <span className={`badge ${getTierClass(item.source_credibility_tier)}`}>
-            {getTierLabel(item.source_credibility_tier)}
+          <span className={`badge ${getTierClass(item.source_credibility_tier, item)}`}>
+            {item.source_type === 'influencer' && <Mic2 size={10} />}
+            {getTierLabel(item.source_credibility_tier, item)}
           </span>
+          {item.source_type === 'influencer' && (
+            <span className="badge badge-gray">{item.source}</span>
+          )}
+          {isSocialCommunityItem(item) && (
+            <span className="badge badge-gray">{item.source}</span>
+          )}
           {/* Phase 3.1: explicit SEC 8-K badge so material filings stand out
               even when listed inside All / category pills. */}
           {item.source === 'sec_edgar' && (
@@ -85,11 +105,11 @@ export default function NewsCard({ item, isHero = false }) {
         </div>
       </div>
       
-      <h3 style={{ fontSize: isHero ? '1.75rem' : '1.1rem', marginBottom: '0.5rem' }}>
+      <h3 className={`news-card-title ${isHero ? 'news-card-title-hero' : ''}`}>
         <a href={safeUrl(item.url)} target="_blank" rel="noopener noreferrer">{item.title}</a>
       </h3>
       
-      <p className="text-muted text-sm mb-4" style={{ flex: 1 }}>{item.summary}</p>
+      <p className="text-muted text-sm mb-4 news-card-summary">{item.summary}</p>
       
       {item.entity_names && item.entity_names.length > 0 && (
         <div className="flex gap-2 flex-wrap mb-4">
@@ -99,17 +119,15 @@ export default function NewsCard({ item, isHero = false }) {
         </div>
       )}
       
-      <div className="flex items-center gap-4 text-xs font-bold mt-auto pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
+      <div className="flex items-center gap-4 text-xs font-bold mt-auto pt-4 news-card-footer">
         <div className="flex items-center gap-1">
           <TrendingUp size={14} className="text-muted" />
-          <span style={{ color: 'var(--accent-amber)' }}>{Math.round(item.buzz_score)} BUZZ</span>
+          <span className="news-card-buzz">{Math.round(displayBuzz)} BUZZ</span>
         </div>
         
         <div className="flex items-center gap-2 flex-1">
           <span className="text-muted">SENTIMENT</span>
-          <div className="progress-container" style={{ width: '60px' }}>
-            <div className={`progress-bar ${sentimentColor}`} style={{ width: `${Math.max(10, Math.min(100, (item.sentiment + 1) * 50))}%` }}></div>
-          </div>
+          <ProgressBar value={sentimentValue} tone={sentimentColor} className="news-card-sentiment" />
         </div>
 
         {item.is_disputed && (

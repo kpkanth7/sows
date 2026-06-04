@@ -25,6 +25,23 @@ STOOQ_SUFFIX = {
     '.L':  '.uk',   # London
 }
 
+# Finnhub profile2 reports marketCapitalization in millions of the profile
+# currency. Store companies.market_cap in USD as required by schema.sql.
+CURRENCY_TO_USD = {
+    'USD': 1.0,
+    'CAD': 0.73,
+    'AUD': 0.66,
+    'EUR': 1.08,
+    'GBP': 1.27,
+    'CHF': 1.10,
+    'JPY': 0.0069,
+    'TWD': 0.031,
+    'HKD': 0.128,
+    'CNY': 0.14,
+    'INR': 0.012,
+    'KRW': 0.00073,
+}
+
 
 def _stooq_ticker(t: str) -> str:
     for src, dst in STOOQ_SUFFIX.items():
@@ -51,6 +68,19 @@ def fetch_stooq_price(ticker: str):
         return float(close), None
     except Exception:
         return None, None
+
+
+def _market_cap_from_finnhub_profile(profile: dict):
+    """Finnhub profile2 returns marketCapitalization in millions of currency."""
+    value = (profile or {}).get('marketCapitalization')
+    if value is None:
+        return None
+    try:
+        currency = (profile or {}).get('currency') or 'USD'
+        fx = CURRENCY_TO_USD.get(str(currency).upper(), 1.0)
+        return int(float(value) * 1_000_000 * fx)
+    except (TypeError, ValueError):
+        return None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -125,6 +155,7 @@ def main():
 
             price = None
             change_pct = None
+            market_cap = None
             
             if finnhub_client and check_quota(sb, 'finnhub'):
                 try:
@@ -137,23 +168,35 @@ def main():
                         change_pct = quote['dp']
                 except Exception as e:
                     logger.error(f"Finnhub quote error for {ticker}: {e}")
+
+            if finnhub_client and check_quota(sb, 'finnhub'):
+                try:
+                    profile = finnhub_client.company_profile2(symbol=ticker)
+                    log_api_call(sb, 'finnhub')
+                    time.sleep(1.1)
+                    market_cap = _market_cap_from_finnhub_profile(profile)
+                except Exception as e:
+                    logger.error(f"Finnhub profile error for {ticker}: {e}")
                     
-            if price is None:
+            if price is None or market_cap is None:
                 try:
                     stock = yf.Ticker(ticker)
                     # history() works for foreign tickers (.HK/.NS/.KS/.SZ/.AX) where
                     # finnhub (US-only) and .info often return nothing. Try it first.
-                    hist = stock.history(period='2d')
-                    if not hist.empty:
+                    hist = stock.history(period='2d') if price is None else None
+                    if hist is not None and not hist.empty:
                         price = float(hist['Close'].iloc[-1])
                         if len(hist) >= 2:
                             prev = float(hist['Close'].iloc[-2])
                             if prev:
                                 change_pct = (price - prev) / prev * 100
-                    if price is None:
-                        # Fallback to .info for US tickers history may miss intraday on.
-                        info = stock.info
-                        price = info.get('currentPrice') or info.get('regularMarketPrice')
+                    if price is None or market_cap is None:
+                        # Fallback to .info for US tickers history may miss intraday on;
+                        # also captures marketCap for Market Map sizing.
+                        info = stock.info or {}
+                        if market_cap is None and info.get('marketCap') is not None:
+                            market_cap = int(info['marketCap'])
+                        price = price or info.get('currentPrice') or info.get('regularMarketPrice')
                         if change_pct is None and info.get('regularMarketChangePercent') is not None:
                             change_pct = info['regularMarketChangePercent'] * 100
                 except Exception as e:
@@ -169,15 +212,19 @@ def main():
                         change_pct = ch
 
             if price is not None:
-                sb.table('companies').update({
+                update = {
                     'stock_price': price,
                     'change_pct_24h': change_pct,
                     'last_updated': 'now()',
-                }).eq('id', company_id).execute()
+                }
+                if market_cap is not None:
+                    update['market_cap'] = market_cap
+                sb.table('companies').update(update).eq('id', company_id).execute()
                 
                 sb.table('stock_snapshots').insert({
                     'company_id': company_id,
                     'price': price,
+                    'market_cap': market_cap,
                     'change_pct': change_pct
                 }).execute()
 

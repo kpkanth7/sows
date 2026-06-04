@@ -6,11 +6,24 @@ import HypeRealityMeter from './HypeRealityMeter';
 import HypeRealityChart from './HypeRealityChart';
 import BenchmarkLeaderboard from './BenchmarkLeaderboard';
 import InsiderTradesPanel from './InsiderTradesPanel';
+import NewsCard from './NewsCard';
 import { safeUrl } from '../lib/urls';
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (diff < 60) return `${diff}m ago`;
+  const hours = Math.floor(diff / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export default function CompanyDetailPanel({ company, onClose }) {
   const [activeTab, setActiveTab] = useState('Overview');
   const [stockHistory, setStockHistory] = useState([]);
+  const [companyNews, setCompanyNews] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState(null);
   
   useEffect(() => {
     if (activeTab === 'Charts' && !company.is_private) {
@@ -21,28 +34,65 @@ export default function CompanyDetailPanel({ company, onClose }) {
     }
   }, [activeTab, company]);
 
+  useEffect(() => {
+    if (!company?.name) return;
+
+    let cancelled = false;
+    const fetchCompanyNews = async () => {
+      setNewsLoading(true);
+      setNewsError(null);
+
+      const { data, error } = await supabase
+        .from('news_items')
+        .select('id, title, summary, url, source, source_type, category, source_credibility_tier, buzz_score, buzz_v2, sentiment, entity_names, published_at, ingested_at, is_disputed, dispute_claim_a, dispute_confidence_a, dispute_claim_b, dispute_confidence_b, dispute_brief')
+        .contains('entity_names', JSON.stringify([company.name]))
+        .order('ingested_at', { ascending: false })
+        .limit(8);
+
+      if (cancelled) return;
+      if (error) {
+        setNewsError(error.message);
+        setCompanyNews([]);
+      } else {
+        setCompanyNews((data || []).map(item => ({
+          ...item,
+          buzz_score: item.buzz_v2 ?? item.buzz_score ?? 0,
+        })));
+      }
+      setNewsLoading(false);
+    };
+
+    fetchCompanyNews();
+    return () => {
+      cancelled = true;
+    };
+  }, [company?.id, company?.name]);
+
   if (!company) return null;
 
+  const latestSignal = companyNews[0];
+  const signalCount = companyNews.length;
+
   return (
-    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(600px, 100vw)', background: 'var(--surface-color)', backdropFilter: 'blur(20px)', zIndex: 2000, boxShadow: '-10px 0 30px rgba(0,0,0,0.5)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
-      <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid var(--border-color)' }}>
-        <div className="flex items-center gap-3">
-          {company.logo_url && <img src={company.logo_url} width={32} height={32} style={{ borderRadius: 6 }} />}
-          <h2 style={{ margin: 0 }}>{company.name}</h2>
+    <div className="company-detail-panel">
+      <div className="company-detail-header">
+        <div className="company-detail-title">
+          {company.logo_url && <img src={company.logo_url} width={32} height={32} className="company-detail-logo" />}
+          <h2 className="company-detail-name">{company.name}</h2>
           <span className="badge badge-gray">{company.ticker || 'PRIVATE'}</span>
         </div>
-        <button className="theme-toggle" onClick={onClose}><X size={24} /></button>
+        <button className="theme-toggle" onClick={onClose} aria-label={`Close ${company.name} detail panel`}><X size={24} /></button>
       </div>
       
-      <div className="p-4 flex gap-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
+      <div className="company-detail-tabs" role="tablist" aria-label={`${company.name} detail sections`}>
         {['Overview', 'Charts', 'Benchmarks', 'Insider', 'News'].map(tab => (
-          <button key={tab} className={`tab-button ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+          <button key={tab} className={`tab-button ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)} role="tab" aria-selected={activeTab === tab}>
             {tab}
           </button>
         ))}
       </div>
       
-      <div className="p-4" style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="company-detail-body">
         {activeTab === 'Overview' && (
           <div className="flex-col gap-4">
             <p className="text-muted">{company.description}</p>
@@ -69,16 +119,32 @@ export default function CompanyDetailPanel({ company, onClose }) {
             </div>
             
             {company.investor_brief && (
-              <div className="card glass-panel mt-4" style={{ background: 'rgba(0,212,255,0.05)', borderLeft: '3px solid var(--accent-blue)' }}>
-                <div className="text-xs text-muted font-bold mb-2">AI INVESTOR BRIEF</div>
-                <p className="text-sm m-0 italic">{company.investor_brief}</p>
+              <div className="card glass-panel investor-brief-card mt-4">
+                <div className="investor-brief-header">
+                  <div>
+                    <div className="text-xs text-muted font-bold mb-2">AI INVESTOR BRIEF</div>
+                    <div className="brief-meta-row">
+                      <span className="badge badge-blue">{company.forecast_direction?.replace('_', ' ') || 'neutral'}</span>
+                      <span className="badge badge-gray">{Math.round(company.forecast_confidence || 0)}% confidence</span>
+                      <span className="badge badge-gray">{signalCount} recent signal{signalCount === 1 ? '' : 's'}</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm m-0">{company.investor_brief}</p>
+                {latestSignal && (
+                  <div className="brief-latest-signal">
+                    <span className="text-xs text-muted font-bold">LATEST TRACKED SIGNAL</span>
+                    <strong>{latestSignal.title}</strong>
+                    <span className="text-xs text-muted">{latestSignal.source} · {timeAgo(latestSignal.published_at || latestSignal.ingested_at)}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
         
         {activeTab === 'Charts' && (
-          <div className="card glass-panel" style={{ height: '400px' }}>
+          <div className="card glass-panel company-detail-chart-card">
             {company.is_private ? (
               <div className="empty-state">No public stock charts available for private companies.</div>
             ) : (
@@ -104,9 +170,25 @@ export default function CompanyDetailPanel({ company, onClose }) {
         )}
         
         {activeTab === 'News' && (
-          <div className="empty-state">
-            <Activity className="empty-icon" />
-            <p>Recent news loading...</p>
+          <div className="company-news-list">
+            {newsLoading ? (
+              <>
+                <div className="skeleton skeleton-card" />
+                <div className="skeleton skeleton-card" />
+              </>
+            ) : newsError ? (
+              <div className="empty-state">
+                <Activity className="empty-icon" />
+                <p>Company news unavailable: {newsError}</p>
+              </div>
+            ) : companyNews.length === 0 ? (
+              <div className="empty-state">
+                <Activity className="empty-icon" />
+                <p>No recent tracked news for {company.name} yet.</p>
+              </div>
+            ) : (
+              companyNews.map(item => <NewsCard key={item.id} item={item} />)
+            )}
           </div>
         )}
       </div>

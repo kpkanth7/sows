@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { cache } from '../services/cache';
 import CategoryPills from './CategoryPills';
 import NewsCard from './NewsCard';
 import EarningsStrip from './EarningsStrip';
 import { Activity } from 'lucide-react';
 
-const CATEGORIES = ['All', 'AI', 'Releases', 'M&A', 'IPO', 'Controversy', 'Conferences', 'Open Source', 'Earnings', 'Filings', 'Research'];
+const CATEGORIES = ['All', 'Influencers', 'Social', 'AI', 'Releases', 'M&A', 'IPO', 'Controversy', 'Conferences', 'Open Source', 'Earnings', 'Filings', 'Research'];
 
 const mapCategory = (uiCat) => {
   const map = {
@@ -17,22 +16,67 @@ const mapCategory = (uiCat) => {
     'Controversy': 'controversy',
     'Conferences': 'conference',
     'Open Source': 'opensource',
-    'Earnings': 'earnings'
+    'Earnings': 'earnings',
   };
   return map[uiCat] || null;
 };
 
-// Phase 3.1: Filings pill filters by `source` (precise ingestor name) rather
-// than the LLM `category` — surfaces SEC 8-K material events (exec changes,
-// M&A, breaches, bankruptcies, etc.) as their own stream regardless of how
-// the LLM labeled the headline. Uses `source` not `source_type` because
-// `source_type` is a coarse bucket ('news'/'social'/'research').
 const SOURCE_FILTER = {
   'Filings': 'sec_edgar',
-  // Phase 3.6: Research pill surfaces arXiv papers (cs.AI/LG/CL/CV/RO).
-  // Patent ingest deferred — arXiv alone is the forward-looking R&D signal
-  // until a USPTO ingestor lands.
+  'Influencers': 'influencer',
+  'Social': 'community',
   'Research': 'arxiv',
+};
+
+const getItemBuzz = (item) => item?.buzz_v2 ?? item?.buzz_score ?? 0;
+const SOCIAL_SUBREDDIT_ALLOWLIST = new Set([
+  'reddit_r_MachineLearning',
+  'reddit_r_singularity',
+  'reddit_r_LocalLLaMA',
+  'reddit_r_OpenAI',
+  'reddit_r_SaaS',
+  'reddit_r_devops',
+  'reddit_r_softwaredevelopment',
+  'reddit_r_ClaudeAI',
+  'reddit_r_Anthropic',
+]);
+
+const mapCommunitySignalsToFeed = (rows) => {
+  const grouped = new Map();
+  for (const row of rows || []) {
+    if (!SOCIAL_SUBREDDIT_ALLOWLIST.has(row.source)) continue;
+    const key = row.post_url || `${row.source}::${row.post_title}`;
+    const existing = grouped.get(key);
+    const entity = row.entity_name;
+    if (!existing) {
+      grouped.set(key, {
+        id: key,
+        title: row.post_title,
+        summary: `Community discussion from ${row.source.replace(/^reddit_r_/, 'r/')} about ${entity}. Treat as sentiment signal, not confirmed reporting.`,
+        url: row.post_url,
+        source: row.source.replace(/^reddit_r_/, 'r/'),
+        source_type: 'community',
+        source_credibility_tier: 4,
+        entity_names: entity ? [entity] : [],
+        sentiment: row.sentiment ?? 0,
+        buzz_score: Math.min(100, 12 + Math.abs(row.sentiment ?? 0) * 22),
+        category: 'social',
+        published_at: row.captured_at,
+        ingested_at: row.captured_at,
+      });
+      continue;
+    }
+
+    if (entity && !existing.entity_names.includes(entity)) {
+      existing.entity_names.push(entity);
+      existing.buzz_score = Math.min(100, existing.buzz_score + 8);
+      existing.summary = `Community discussion from ${existing.source} about ${existing.entity_names.join(', ')}. Treat as sentiment signal, not confirmed reporting.`;
+    }
+    if (typeof row.sentiment === 'number') {
+      existing.sentiment = (existing.sentiment + row.sentiment) / 2;
+    }
+  }
+  return Array.from(grouped.values()).sort((a, b) => new Date(b.published_at || b.ingested_at) - new Date(a.published_at || a.ingested_at));
 };
 
 export default function NewsSection() {
@@ -48,25 +92,52 @@ export default function NewsSection() {
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
+    if (cat === 'Social') {
+      const { data, error } = await supabase
+        .from('community_signals')
+        .select('source, entity_name, post_title, post_url, sentiment, captured_at')
+        .gte('captured_at', threeDaysAgo.toISOString())
+        .order('captured_at', { ascending: false })
+        .range(pageNum * 60, (pageNum + 1) * 60 - 1);
+
+      if (!error && data) {
+        const mapped = mapCommunitySignalsToFeed(data);
+        if (mapped.length < 20) {
+          setHasMore(false);
+        }
+        if (append) {
+          setNews(prev => [...prev, ...mapped]);
+        } else {
+          setNews(mapped);
+        }
+      } else {
+        setHasMore(false);
+      }
+      setLoading(false);
+      return;
+    }
+
     let query = supabase.from('news_items')
       .select('*')
       .gte('ingested_at', threeDaysAgo.toISOString())
-      // Phase 2.13: rank by LLM-rated composite buzz_v2 first (nulls last for
-      // not-yet-processed items), then fall back to recency for stability.
       .order('buzz_v2', { ascending: false, nullsFirst: false })
       .order('ingested_at', { ascending: false })
       .range(pageNum * 20, (pageNum + 1) * 20 - 1);
-    
+
     const sourceFilter = SOURCE_FILTER[cat];
     if (sourceFilter) {
-      query = query.eq('source', sourceFilter);
+      if (cat === 'Influencers') {
+        query = query.eq('source_type', sourceFilter);
+      } else {
+        query = query.eq('source', sourceFilter);
+      }
     } else {
       const mappedCat = mapCategory(cat);
       if (mappedCat) {
         query = query.eq('category', mappedCat);
       }
     }
-    
+
     const { data, error } = await query;
     if (!error && data) {
       if (data.length < 20) {
@@ -89,12 +160,6 @@ export default function NewsSection() {
     setPage(0);
   }, [activeCategory]);
 
-  // Phase 3.9: Supabase Realtime — subscribe to news_items INSERT and
-  // auto-prepend matching rows to the feed. Kills the need for polling /
-  // manual refresh; fresh signals appear at the top within seconds of ingest.
-  // Scope: news_items only (stocks/companies/digests still use their own
-  // refresh cadence). Re-subscribes on activeCategory change so the handler
-  // closure sees the current filter.
   useEffect(() => {
     const threeDaysAgoMs = Date.now() - 3 * 24 * 60 * 60 * 1000;
     const channel = supabase
@@ -106,21 +171,23 @@ export default function NewsSection() {
           const row = payload.new;
           if (!row) return;
 
-          // Filter match — mirror fetchNews's category/source logic.
           const sourceFilter = SOURCE_FILTER[activeCategory];
           if (sourceFilter) {
-            if (row.source !== sourceFilter) return;
+            if (activeCategory === 'Social') return;
+            if (activeCategory === 'Influencers') {
+              if (row.source_type !== sourceFilter) return;
+            } else if (row.source !== sourceFilter) {
+              return;
+            }
           } else {
             const mappedCat = mapCategory(activeCategory);
             if (mappedCat && row.category !== mappedCat) return;
           }
 
-          // Defensive 3-day window check.
           if (row.ingested_at && new Date(row.ingested_at).getTime() < threeDaysAgoMs) return;
 
-          // Dedup against current state.
           setNews(prev => {
-            if (prev.some(n => n.id === row.id)) return prev;
+            if (prev.some(item => item.id === row.id)) return prev;
             return [row, ...prev];
           });
         }
@@ -143,16 +210,16 @@ export default function NewsSection() {
       },
       { threshold: 1.0 }
     );
-    
+
     if (observerTarget.current) {
       observer.observe(observerTarget.current);
     }
     return () => observer.disconnect();
   }, [page, loading, news.length, activeCategory, hasMore]);
 
-  const hero = news.length > 0 ? [...news].sort((a,b) => b.buzz_score - a.buzz_score)[0] : null;
-  const gridItems = news.filter(n => n.id !== hero?.id).slice(0, 6);
-  const feedItems = news.filter(n => n.id !== hero?.id).slice(6);
+  const hero = news.length > 0 ? [...news].sort((a, b) => getItemBuzz(b) - getItemBuzz(a))[0] : null;
+  const gridItems = news.filter(item => item.id !== hero?.id).slice(0, 6);
+  const feedItems = news.filter(item => item.id !== hero?.id).slice(6);
 
   return (
     <section id="news">
@@ -162,16 +229,14 @@ export default function NewsSection() {
           <p className="text-muted">Real-time parsed intelligence from 10+ sources</p>
         </div>
       </div>
-      
+
       <CategoryPills categories={CATEGORIES} activeCategory={activeCategory} onSelect={setActiveCategory} />
 
-      {/* Phase 3.2: countdown + sentiment-delta strip only shown when the
-          Earnings pill is active. Keeps the rest of the feed untouched. */}
       {activeCategory === 'Earnings' && <EarningsStrip />}
 
       {loading && news.length === 0 ? (
         <div className="grid-cols-2">
-          <div className="skeleton skeleton-card" style={{ gridColumn: '1 / -1', height: '300px' }}></div>
+          <div className="skeleton skeleton-card news-section-hero-skeleton"></div>
           {[...Array(6)].map((_, i) => <div key={i} className="skeleton skeleton-card"></div>)}
         </div>
       ) : news.length === 0 ? (
@@ -182,16 +247,16 @@ export default function NewsSection() {
         </div>
       ) : (
         <>
-          <div className="grid-cols-2" style={{ marginBottom: '2rem' }}>
+          <div className="grid-cols-2 news-grid-top">
             {hero && <NewsCard item={hero} isHero={true} />}
             {gridItems.map(item => <NewsCard key={item.id} item={item} />)}
           </div>
-          
+
           <div className="flex-col gap-4">
             {feedItems.map(item => <NewsCard key={item.id} item={item} />)}
           </div>
-          
-          <div ref={observerTarget} style={{ height: '20px', margin: '2rem 0' }}>
+
+          <div ref={observerTarget} className="news-scroll-anchor">
             {loading && <div className="text-center text-muted font-bold">Loading more signals...</div>}
           </div>
         </>

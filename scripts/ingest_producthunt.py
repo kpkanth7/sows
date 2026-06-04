@@ -1,7 +1,6 @@
 import os
 import httpx
 import logging
-from datetime import datetime, timezone
 from db import get_client, extract_entities
 from companies_config import ALL_COMPANIES
 from ingest_news import calc_buzz, save_news
@@ -9,12 +8,47 @@ from ingest_news import calc_buzz, save_news
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+TOKEN_URL = "https://api.producthunt.com/v2/oauth/token"
+GRAPHQL_URL = "https://api.producthunt.com/v2/api/graphql"
+
+
+def get_producthunt_token() -> str | None:
+    token = os.environ.get('PRODUCTHUNT_TOKEN')
+    if token:
+        return token
+
+    client_id = os.environ.get('PRODUCTHUNT_CLIENT_ID')
+    client_secret = os.environ.get('PRODUCTHUNT_CLIENT_SECRET')
+    if not client_id or not client_secret:
+        logger.warning("Product Hunt credentials not set")
+        return None
+
+    resp = httpx.post(
+        TOKEN_URL,
+        json={
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "client_credentials",
+        },
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    access_token = resp.json().get("access_token")
+    if not access_token:
+        raise RuntimeError("Product Hunt token response missing access_token")
+    return access_token
+
+
 def main():
     sb = get_client()
-    ph_token = os.environ.get('PRODUCTHUNT_TOKEN')
+    ph_token = get_producthunt_token()
     
     if not ph_token:
-        logger.warning("PRODUCTHUNT_TOKEN not set")
+        logger.warning("Product Hunt token unavailable")
         return
         
     query = """
@@ -36,11 +70,12 @@ def main():
     
     headers = {
         "Authorization": f"Bearer {ph_token}",
+        "Accept": "application/json",
         "Content-Type": "application/json"
     }
     
     try:
-        resp = httpx.post("https://api.producthunt.com/v2/api/graphql", json={"query": query}, headers=headers, timeout=10)
+        resp = httpx.post(GRAPHQL_URL, json={"query": query}, headers=headers, timeout=10)
         resp.raise_for_status()
         
         edges = resp.json().get('data', {}).get('posts', {}).get('edges', [])

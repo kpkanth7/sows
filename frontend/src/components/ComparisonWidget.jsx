@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { GitCompare, TrendingUp, Github, DollarSign, Calendar } from 'lucide-react';
+import { GitCompare, TrendingUp, Github, DollarSign, Calendar, ChevronDown } from 'lucide-react';
 import ForecastBadge from './ForecastBadge';
 
 // Phase 3.12: head-to-head decision tool. Beyond price ticker:
@@ -29,7 +29,7 @@ async function fetchEnriched(companyId, companyName) {
   const news = await supabase
     .from('news_items')
     .select('buzz_v2')
-    .contains('entity_names', [companyName])
+    .contains('entity_names', JSON.stringify([companyName]))
     .not('buzz_v2', 'is', null)
     .gte('ingested_at', since);
   const buzzVals = (news.data || []).map(r => Number(r.buzz_v2)).filter(v => !isNaN(v));
@@ -67,12 +67,40 @@ function MetricRow({ icon: Icon, label, valueA, valueB, fmt = (v) => v }) {
   const aWins = cmpAble && numA > numB;
   const bWins = cmpAble && numB > numA;
   return (
-    <div className="flex items-center justify-between" style={{ padding: '0.45rem 0', borderBottom: '1px solid var(--border-color)' }}>
-      <span className={`font-bold text-sm`} style={{ width: '35%', textAlign: 'left', color: aWins ? 'var(--accent-green)' : 'var(--text-primary)' }}>{a}</span>
-      <span className="text-xs text-muted flex items-center gap-1" style={{ width: '30%', justifyContent: 'center' }}>
+    <div className="comparison-row">
+      <span className={`comparison-value ${aWins ? 'is-winner' : ''}`}>{a}</span>
+      <span className="comparison-label">
         <Icon size={12} /> {label}
       </span>
-      <span className={`font-bold text-sm`} style={{ width: '35%', textAlign: 'right', color: bWins ? 'var(--accent-green)' : 'var(--text-primary)' }}>{b}</span>
+      <span className={`comparison-value comparison-value-right ${bWins ? 'is-winner' : ''}`}>{b}</span>
+    </div>
+  );
+}
+
+function CompanyPicker({ label, company, value, companies, onChange }) {
+  return (
+    <label className="comparison-picker">
+      <span className="comparison-picker-label">{label}</span>
+      <span className="comparison-picker-main">
+        <span>
+          <strong>{company?.ticker || company?.name || '—'}</strong>
+          <small>{company?.name || 'Select company'}</small>
+        </span>
+        <ChevronDown size={16} aria-hidden="true" />
+      </span>
+      <select value={value} onChange={e => onChange(e.target.value)} aria-label={`${label} company`}>
+        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function ForecastPanel({ side, company }) {
+  return (
+    <div className="comparison-forecast">
+      <span>{side}</span>
+      <strong>{company.ticker || company.name}</strong>
+      <ForecastBadge direction={company.forecast_direction} confidence={company.forecast_confidence} />
     </div>
   );
 }
@@ -83,6 +111,7 @@ export default function ComparisonWidget() {
   const [idB, setIdB] = useState('');
   const [enrichedA, setEnrichedA] = useState(null);
   const [enrichedB, setEnrichedB] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase
@@ -97,6 +126,7 @@ export default function ComparisonWidget() {
             setIdB(data[1].id);
           }
         }
+        setLoading(false);
       });
   }, []);
 
@@ -110,28 +140,45 @@ export default function ComparisonWidget() {
     if (compB) fetchEnriched(compB.id, compB.name).then(setEnrichedB);
   }, [compB]);
 
-  if (!compA || !compB) return null;
+  if (loading) {
+    return <div className="skeleton skeleton-card mt-6 comparison-widget-skeleton" />;
+  }
+
+  if (!compA || !compB) {
+    return (
+      <div className="card glass-panel mt-6 comparison-widget">
+        <div className="comparison-header">
+          <GitCompare size={20} className="text-accent-amber" />
+          <div>
+            <h3>Head-to-Head</h3>
+            <p>Pick two tracked companies to compare investor signals.</p>
+          </div>
+        </div>
+        <p className="text-sm text-muted m-0">Need at least two companies to compare.</p>
+      </div>
+    );
+  }
 
   const valuationA = compA.market_cap || compA.last_valuation || null;
   const valuationB = compB.market_cap || compB.last_valuation || null;
 
   return (
-    <div className="card glass-panel mt-6">
-      <h3 className="flex items-center gap-2 mb-4">
-        <GitCompare size={20} className="text-accent-amber" /> Head-to-Head
-      </h3>
-
-      <div className="flex gap-4 mb-6">
-        <select value={idA} onChange={e => setIdA(e.target.value)} className="flex-1" style={{ background: 'var(--bg-color)' }}>
-          {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <div className="font-bold text-muted flex items-center justify-center px-2">VS</div>
-        <select value={idB} onChange={e => setIdB(e.target.value)} className="flex-1" style={{ background: 'var(--bg-color)' }}>
-          {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+    <div className="card glass-panel mt-6 comparison-widget">
+      <div className="comparison-header">
+        <GitCompare size={20} className="text-accent-amber" />
+        <div>
+          <h3>Head-to-Head</h3>
+          <p>Valuation, buzz, developer momentum, and catalyst timing.</p>
+        </div>
       </div>
 
-      <div>
+      <div className="comparison-matchup" aria-label="Head-to-head company selectors">
+        <CompanyPicker label="Left" company={compA} value={idA} companies={companies} onChange={setIdA} />
+        <div className="comparison-versus">VS</div>
+        <CompanyPicker label="Right" company={compB} value={idB} companies={companies} onChange={setIdB} />
+      </div>
+
+      <div className="comparison-table">
         <MetricRow
           icon={DollarSign}
           label="VALUATION"
@@ -160,9 +207,9 @@ export default function ComparisonWidget() {
         />
       </div>
 
-      <div className="flex justify-between items-center mt-4 gap-4">
-        <ForecastBadge direction={compA.forecast_direction} confidence={compA.forecast_confidence} />
-        <ForecastBadge direction={compB.forecast_direction} confidence={compB.forecast_confidence} />
+      <div className="comparison-forecast-grid">
+        <ForecastPanel side="Left forecast" company={compA} />
+        <ForecastPanel side="Right forecast" company={compB} />
       </div>
     </div>
   );

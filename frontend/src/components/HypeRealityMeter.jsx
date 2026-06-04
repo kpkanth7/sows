@@ -1,12 +1,17 @@
+import ProgressBar from './ProgressBar';
+
 export default function HypeRealityMeter({ hype = 50, reality = 50 }) {
   let analysis = 'Balanced';
   let hypeColor = 'blue';
+  let analysisClass = 'is-balanced';
   
   if (hype - reality > 20) {
     analysis = 'Potentially Overhyped';
     hypeColor = 'amber';
+    analysisClass = 'is-overhyped';
   } else if (reality - hype > 20) {
     analysis = 'Underrated / High Traction';
+    analysisClass = 'is-underrated';
   }
 
   return (
@@ -15,19 +20,15 @@ export default function HypeRealityMeter({ hype = 50, reality = 50 }) {
         <span>HYPE SCORE</span>
         <span>{Math.round(hype)}</span>
       </div>
-      <div className="progress-container">
-        <div className={`progress-bar ${hypeColor}`} style={{ width: `${Math.min(hype, 100)}%` }}></div>
-      </div>
+      <ProgressBar value={hype} tone={hypeColor} />
       
       <div className="flex justify-between text-xs text-muted font-bold mt-2">
         <span>REALITY SCORE (Traction)</span>
         <span>{Math.round(reality)}</span>
       </div>
-      <div className="progress-container">
-        <div className="progress-bar green" style={{ width: `${Math.min(reality, 100)}%` }}></div>
-      </div>
+      <ProgressBar value={reality} tone="green" />
 
-      <div className="text-xs mt-2 font-bold" style={{ color: analysis.includes('Overhyped') ? 'var(--accent-amber)' : (analysis.includes('Underrated') ? 'var(--accent-green)' : 'var(--text-secondary)') }}>
+      <div className={`text-xs mt-2 font-bold hype-reality-analysis ${analysisClass}`}>
         {analysis}
       </div>
     </div>
