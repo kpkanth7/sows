@@ -15,3 +15,6 @@ security.md
 # Local-only AI agent handoff notes (never commit)
 handoff.md
 HANDOFF.md
+
+# Local-only planning tracker (keep in folder, never commit)
+tasks/todo.md
