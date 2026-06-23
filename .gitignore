@@ -18,3 +18,9 @@ HANDOFF.md
 
 # Local-only planning tracker (keep in folder, never commit)
 tasks/todo.md
+
+# Local-only agent / instruction notes
+.superpowers/
+AGENTS.md
+INSTRUCTIONS.md
+docs/superpowers/
