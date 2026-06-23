@@ -4,8 +4,8 @@ import json
 from datetime import datetime, timedelta, timezone
 import httpx
 from atproto import Client
-from db import get_client, extract_entities, check_quota, COMPANY_SYNONYMS
-from llm import generate_llm_content, strip_json_fence
+from db import get_client, extract_entities, COMPANY_SYNONYMS
+from llm import generate_llm_content, strip_json_fence, has_llm_capacity
 from companies_config import BLUESKY_ACCOUNTS, ALL_COMPANIES
 from textblob import TextBlob
 from ingest_news import calc_buzz, save_news
@@ -138,7 +138,7 @@ def main():
                     category = infer_bluesky_category(text)
                     llm_processed_flag = False
 
-                    if check_quota(sb, 'gemini', 1):
+                    if has_llm_capacity(sb, 1):
                         try:
                             enriched = summarize_bluesky_post(text, sb)
                             title = enriched['title'] or title

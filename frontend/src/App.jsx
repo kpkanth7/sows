@@ -24,7 +24,7 @@ const TOP_TAB_META = {
   },
   investors: {
     label: "Investor Hub",
-    description: "Review investor forecasts, influencer conviction, disputes, insider activity, and daily digest signals in one place.",
+    description: "Review investor forecasts, catalysts, influencer track records, insider activity, and daily digest signals in one place.",
   },
   status: {
     label: "Pipeline Status",

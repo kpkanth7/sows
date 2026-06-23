@@ -10,6 +10,13 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+LLM_QUOTA_DEFAULTS = {
+    "groq": {"daily_limit": 1000, "per_min_limit": 30},
+    "gemini": {"daily_limit": 1000, "per_min_limit": 15},
+    "cerebras": {"daily_limit": 1000, "per_min_limit": 30},
+    "openrouter": {"daily_limit": 1000, "per_min_limit": 20},
+}
+
 def get_client() -> Client:
     supabase_url = os.environ.get('SUPABASE_URL', '')
     supabase_key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
@@ -22,6 +29,17 @@ def check_quota(sb: Client, source_name: str, cost: int = 1) -> bool:
     try:
         res = sb.table("api_quota_log").select("*").eq("source_name", source_name).execute()
         if not res.data:
+            defaults = LLM_QUOTA_DEFAULTS.get(source_name)
+            if defaults:
+                sb.table("api_quota_log").upsert({
+                    "source_name": source_name,
+                    "calls_today": 0,
+                    "daily_limit": defaults["daily_limit"],
+                    "calls_this_min": 0,
+                    "per_min_limit": defaults["per_min_limit"],
+                    "last_reset": str(date.today())
+                }, on_conflict="source_name").execute()
+                return True
             return True
         row = res.data[0]
         today = str(date.today())

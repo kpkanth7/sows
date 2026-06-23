@@ -31,4 +31,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          LLM_PROVIDER_CHAIN: ${{ secrets.LLM_PROVIDER_CHAIN }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
         run: python scripts/generate_daily_digest.py

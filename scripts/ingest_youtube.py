@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 from db import get_client, check_quota, log_api_call, extract_entities, COMPANY_SYNONYMS
-from llm import generate_llm_content, strip_json_fence
+from llm import generate_llm_content, strip_json_fence, has_llm_capacity
 from companies_config import YOUTUBE_CHANNELS, ALL_COMPANIES
 from ingest_news import calc_buzz
 
@@ -133,7 +133,7 @@ def main():
                     detected_category = infer_youtube_category(category, title, transcript_text[:280])
                     llm_processed_flag = False
                     
-                    if transcript_text and check_quota(sb, 'gemini', 1):
+                    if transcript_text and has_llm_capacity(sb, 1):
                         prompt = (
                             f"Analyze the following video transcript/description for the video '{title}'.\n\n"
                             f"1. Is this video sponsored (does the creator thank a sponsor, pitch a product promotion, or do an ad read)? Answer true or false.\n"

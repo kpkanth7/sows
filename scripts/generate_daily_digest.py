@@ -18,8 +18,8 @@ import json
 from datetime import datetime, timedelta, timezone, date
 from collections import Counter
 
-from db import get_client, record_health, check_quota
-from llm import generate_llm_content, strip_json_fence
+from db import get_client, record_health
+from llm import generate_llm_content, strip_json_fence, has_llm_capacity
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -184,7 +184,7 @@ def _parse_digest_response(text: str) -> dict:
 
 def main():
     sb = get_client()
-    if not check_quota(sb, 'gemini', 1):
+    if not has_llm_capacity(sb, 1):
         logger.warning("LLM quota exhausted — skipping digest.")
         return {'status': 'partial', 'detail': 'LLM quota exhausted; digest skipped.'}
 

@@ -876,6 +876,11 @@ section {
   border-bottom: 1px solid var(--border-color);
 }
 
+.conference-event-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .conference-event-dot {
   width: 8px;
   height: 8px;
@@ -900,6 +905,38 @@ section {
 
 .conference-event-dot.is-default {
   background: var(--text-secondary);
+}
+
+.conference-event-relative {
+  margin-top: 0.15rem;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.conference-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.conference-event-meta-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.conference-event-footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
 }
 
 .market-map-panel-header {
@@ -2035,6 +2072,7 @@ tr.disputed {
 
 .investor-hub-brief-anywhere {
   overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .investor-hub-controversy-badge {
@@ -2100,6 +2138,10 @@ tr.disputed {
 
 .investor-hub-dispute-brief {
   margin: 0;
+}
+
+.investor-hub-shell section + section {
+  margin-top: 1.5rem;
 }
 
 /* Empty State */

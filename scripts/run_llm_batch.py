@@ -1,11 +1,10 @@
-import os
 import math
 import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from db import get_client, check_quota
-from llm import generate_llm_content, strip_json_fence
+from db import get_client
+from llm import generate_llm_content, strip_json_fence, has_llm_capacity, get_primary_provider
 from companies_config import TIER1_COMPANIES
 
 logging.basicConfig(level=logging.INFO)
@@ -129,7 +128,7 @@ def run_dispute_detection(sb):
                         
                     prompt = f"Do these two claims contradict each other? Claim 1: '{c1['claim_text']}'. Claim 2: '{c2['claim_text']}'. Answer with only YES or NO."
                     
-                    if check_quota(sb, 'gemini', 1):
+                    if has_llm_capacity(sb, 1):
                         resp_text = generate_llm_content(prompt, sb)
                         if "YES" in resp_text.upper():
                             conf1 = float(c1['credibility_weight']) * 100
@@ -161,8 +160,8 @@ def update_company_briefs(sb):
         res = sb.table('companies').select('*').in_('poll_tier', [1, 2]).execute()
         companies = res.data
         
-        if not check_quota(sb, 'gemini', 1):
-            logger.warning("Gemini quota reached before processing briefs.")
+        if not has_llm_capacity(sb, 1):
+            logger.warning("LLM capacity reached before processing briefs.")
             return
 
         time_limit = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
@@ -247,18 +246,9 @@ Return ONLY a valid JSON object where keys are the exact company names. Example:
 
 def main():
     sb = get_client()
-    provider = os.environ.get('LLM_PROVIDER', 'gemini').lower()
-    if provider == 'groq':
-        api_key = os.environ.get('GROQ_API_KEY')
-    else:
-        api_key = os.environ.get('GEMINI_API_KEY')
-        
-    if not api_key:
-        logger.warning(f"API key not set for provider {provider}")
-        return
-        
-    if not check_quota(sb, 'gemini', 1):
-        logger.warning("Quota limit reached")
+    provider = get_primary_provider()
+    if not has_llm_capacity(sb, 1):
+        logger.warning(f"No LLM capacity left for provider chain starting with {provider}")
         return
         
     six_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
@@ -269,7 +259,7 @@ def main():
     
     batch_size = 5
     for i in range(0, len(items), batch_size):
-        if not check_quota(sb, 'gemini', 1):
+        if not has_llm_capacity(sb, 1):
             break
         batch = items[i:i+batch_size]
         process_news_batch(sb, batch)

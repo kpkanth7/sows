@@ -112,6 +112,10 @@ Add these in GitHub repo settings if you want scheduled jobs to work:
 - `REDDIT_USER_AGENT`
 - `GEMINI_API_KEY`
 - `GROQ_API_KEY`
+- `LLM_PROVIDER`
+- `LLM_PROVIDER_CHAIN`
+- `LLM_MODEL`
+- `GEMINI_MODEL`
 
 Often also needed:
 
@@ -122,8 +126,9 @@ Often also needed:
 - `ALPHA_VANTAGE_KEY`
 - `SEC_USER_AGENT`
 - `COURTLISTENER_API_TOKEN`
-- `LLM_PROVIDER`
-- `LLM_MODEL`
+
+GitHub Actions do not read local `.env` files. If a value is needed by a
+scheduled workflow, it has to live in GitHub repo secrets.
 
 ## Step 7: Deploy to Vercel
 

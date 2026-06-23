@@ -355,7 +355,10 @@ INSERT INTO api_quota_log (source_name, calls_today, daily_limit, calls_this_min
     ('reddit', 0, 144000, 0, 100),
     ('stackexchange', 0, 10000, 0, 30),
     ('github', 0, 5000, 0, NULL),
+    ('groq', 0, 1000, 0, 30),
     ('gemini', 0, 1000, 0, 15),
+    ('cerebras', 0, 1000, 0, 30),
+    ('openrouter', 0, 1000, 0, 20),
     ('devto', 0, 86400, 0, 1),
     ('arxiv', 0, 28800, 0, NULL)
 ON CONFLICT (source_name) DO NOTHING;

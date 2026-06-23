@@ -24,8 +24,8 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-from db import get_client, record_health, check_quota
-from llm import generate_llm_content, strip_json_fence
+from db import get_client, record_health
+from llm import generate_llm_content, strip_json_fence, has_llm_capacity
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -145,7 +145,7 @@ def main():
     # 1) Decay always runs — keeps the panel moving even when LLM is exhausted.
     _decay_all(sb)
 
-    if not check_quota(sb, 'gemini', 1):
+    if not has_llm_capacity(sb, 1):
         logger.warning("LLM quota exhausted — skipping validation pass.")
         return
 
@@ -166,7 +166,7 @@ def main():
 
     processed = 0
     for i in range(0, len(claims), CLAIMS_PER_PROMPT):
-        if not check_quota(sb, 'gemini', 1):
+        if not has_llm_capacity(sb, 1):
             logger.warning("Quota tripped mid-run; stopping.")
             break
         batch = claims[i:i + CLAIMS_PER_PROMPT]
