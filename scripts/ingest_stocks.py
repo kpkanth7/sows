@@ -25,6 +25,18 @@ STOOQ_SUFFIX = {
     '.L':  '.uk',   # London
 }
 
+TICKER_TO_CURRENCY = {
+    '.HK': 'HKD',
+    '.KS': 'KRW',
+    '.NS': 'INR',
+    '.SZ': 'CNY',
+    '.SS': 'CNY',
+    '.AX': 'AUD',
+    '.TO': 'CAD',
+    '.PA': 'EUR',
+    '.L': 'GBP',
+}
+
 # Finnhub profile2 reports marketCapitalization in millions of the profile
 # currency. Store companies.market_cap in USD as required by schema.sql.
 CURRENCY_TO_USD = {
@@ -77,10 +89,39 @@ def _market_cap_from_finnhub_profile(profile: dict):
         return None
     try:
         currency = (profile or {}).get('currency') or 'USD'
-        fx = CURRENCY_TO_USD.get(str(currency).upper(), 1.0)
+        fx = _usd_fx_rate(currency)
+        if fx is None:
+            return None
         return int(float(value) * 1_000_000 * fx)
     except (TypeError, ValueError):
         return None
+
+
+def _currency_from_ticker(ticker: str) -> str:
+    for suffix, currency in TICKER_TO_CURRENCY.items():
+        if ticker.endswith(suffix):
+            return currency
+    return 'USD'
+
+
+def _usd_fx_rate(currency: str) -> float | None:
+    """Return a live USD conversion rate when possible."""
+    cur = str(currency or 'USD').upper()
+    if cur == 'USD':
+        return 1.0
+
+    try:
+        pair = yf.Ticker(f"USD{cur}=X")
+        hist = pair.history(period='5d')
+        if hist is not None and not hist.empty:
+            rate = float(hist['Close'].iloc[-1])
+            if rate > 0:
+                return 1.0 / rate
+    except Exception as e:
+        logger.debug(f"FX lookup failed for {cur}: {e}")
+
+    logger.warning(f"No live FX rate available for {cur}; skipping USD conversion.")
+    return None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -194,6 +235,7 @@ def main():
             price = None
             change_pct = None
             market_cap = None
+            currency = _currency_from_ticker(ticker)
             
             if finnhub_client and check_quota(sb, 'finnhub'):
                 try:
@@ -212,6 +254,7 @@ def main():
                     profile = finnhub_client.company_profile2(symbol=ticker)
                     log_api_call(sb, 'finnhub')
                     time.sleep(1.1)
+                    currency = (profile or {}).get('currency') or currency
                     market_cap = _market_cap_from_finnhub_profile(profile)
                 except Exception as e:
                     logger.error(f"Finnhub profile error for {ticker}: {e}")
@@ -232,8 +275,11 @@ def main():
                         # Fallback to .info for US tickers history may miss intraday on;
                         # also captures marketCap for Market Map sizing.
                         info = stock.info or {}
+                        currency = info.get('currency') or currency
                         if market_cap is None and info.get('marketCap') is not None:
-                            market_cap = int(info['marketCap'])
+                            fx = _usd_fx_rate(currency)
+                            if fx is not None:
+                                market_cap = int(float(info['marketCap']) * fx)
                         price = price or info.get('currentPrice') or info.get('regularMarketPrice')
                         if change_pct is None and info.get('regularMarketChangePercent') is not None:
                             change_pct = info['regularMarketChangePercent'] * 100
@@ -248,6 +294,13 @@ def main():
                     price = px
                     if ch is not None:
                         change_pct = ch
+
+            if price is not None:
+                fx = _usd_fx_rate(currency)
+                if fx is not None:
+                    price = float(price) * fx
+                else:
+                    price = None
 
             if price is not None:
                 update = {

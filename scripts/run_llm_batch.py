@@ -189,7 +189,7 @@ def update_company_briefs(sb):
         )
         
         for comp in companies:
-            news_res = sb.table('news_items').select('title, summary, source_type, source, category, buzz_v2').contains('entity_names', f'["{comp["name"]}"]').gte('ingested_at', time_limit).order('ingested_at', desc=True).limit(5).execute()
+            news_res = sb.table('news_items').select('title, summary, source_type, source, category, buzz_v2').contains('entity_names', json.dumps([comp["name"]])).gte('ingested_at', time_limit).order('ingested_at', desc=True).limit(5).execute()
             comm_res = sb.table('community_signals').select('post_title, sentiment').eq('entity_name', comp['name']).gte('captured_at', time_limit).order('captured_at', desc=True).limit(3).execute()
             inf_res = sb.table('influencer_signals').select('content_title').eq('entity_name', comp['name']).gte('published_at', time_limit).order('published_at', desc=True).limit(3).execute()
             

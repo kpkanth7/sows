@@ -14,6 +14,7 @@ are skipped (cannot compute a meaningful delta).
 Designed to be idempotent + safe to re-run daily.
 """
 import logging
+import json
 from datetime import date, timedelta, datetime, timezone
 
 from db import get_client, record_health
@@ -30,7 +31,7 @@ def _avg_sentiment(sb, company_name: str, start: date, end: date):
     res = (
         sb.table('news_items')
           .select('sentiment')
-          .contains('entity_names', [company_name])
+          .contains('entity_names', json.dumps([company_name]))
           .gte('ingested_at', start.isoformat())
           .lte('ingested_at', (end + timedelta(days=1)).isoformat())
           .execute()

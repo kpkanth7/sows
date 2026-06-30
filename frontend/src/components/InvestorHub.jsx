@@ -310,6 +310,9 @@ function buildInfluencerRows(influencers, recentSignals) {
     };
   }).sort((a, b) => {
     if (a.categoryRank !== b.categoryRank) return a.categoryRank - b.categoryRank;
+    const aLast = a.last_active ? new Date(a.last_active).getTime() : 0;
+    const bLast = b.last_active ? new Date(b.last_active).getTime() : 0;
+    if (bLast !== aLast) return bLast - aLast;
     if (b.trust_score !== a.trust_score) return b.trust_score - a.trust_score;
     return b.recentSignalCount - a.recentSignalCount;
   });
@@ -331,6 +334,7 @@ export default function InvestorHub() {
 
       setLoading(true);
       const newsSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const influencerSince = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
       const recent30Date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const today = new Date().toISOString().slice(0, 10);
 
@@ -381,7 +385,7 @@ export default function InvestorHub() {
         supabase
           .from('influencer_signals')
           .select('influencer_id, entity_name, content_title, content_url, published_at')
-          .gte('published_at', newsSince)
+          .gte('published_at', influencerSince)
           .order('published_at', { ascending: false })
           .limit(200),
       ]);

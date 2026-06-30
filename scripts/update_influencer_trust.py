@@ -66,7 +66,7 @@ def _gather_evidence(sb, claim):
     res = (
         sb.table('news_items')
           .select('title, summary, source_credibility_tier')
-          .contains('entity_names', [claim.get('entity_name')])
+          .contains('entity_names', json.dumps([claim.get('entity_name')]))
           .in_('source_credibility_tier', [1, 2])
           .gte('published_at', start)
           .lte('published_at', end_dt.isoformat())

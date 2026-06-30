@@ -286,7 +286,7 @@ def fetch_rss(sb):
                     'entity_names': entities,
                     'sentiment': sentiment,
                     'buzz_score': calc_buzz(sentiment, entities),
-                    'category': infer_rss_category(title, feed_url if not official_company else official_company),
+                    'category': 'release' if official_company else infer_rss_category(title, feed_url),
                 }
                 save_news(sb, item)
         except Exception as e:

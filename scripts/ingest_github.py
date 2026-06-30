@@ -167,9 +167,16 @@ def fetch_releases_via_graphql(sb, github_token):
             company_id = res.data[0]['id']
 
             for repo in repos:
+                if not repo or not repo.get('name'):
+                    continue
+                repo_url = repo.get('url')
+                if not repo_url:
+                    continue
                 repo_name = f"{org}/{repo['name']}"
                 releases = (repo.get('releases') or {}).get('nodes') or []
                 for rel in releases:
+                    if not rel:
+                        continue
                     tag = rel.get('tagName')
                     if not tag or not rel.get('url'):
                         continue
@@ -177,7 +184,7 @@ def fetch_releases_via_graphql(sb, github_token):
                         sb.table('github_signals').insert({
                             'repo_name': repo_name,
                             'company_id': company_id,
-                            'repo_url': repo['url'],
+                            'repo_url': repo_url,
                             'stars': repo.get('stargazerCount'),
                             'latest_release': tag,
                             'release_date': rel.get('publishedAt'),
