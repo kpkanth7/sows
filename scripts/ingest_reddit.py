@@ -15,6 +15,7 @@ import httpx
 from textblob import TextBlob
 from db import get_client, extract_entities
 from companies_config import REDDIT_SUBREDDITS, ALL_COMPANIES
+from ingest_news import sentiment_text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ def main():
             entities = extract_entities(title, ALL_COMPANIES)
             if not entities:
                 continue
-            sentiment = TextBlob(title).sentiment.polarity
+            sentiment = TextBlob(sentiment_text(title, entry.get("summary"), entry.get("description"))).sentiment.polarity
             for entity in entities:
                 try:
                     sb.table('community_signals').insert({

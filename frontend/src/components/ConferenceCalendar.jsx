@@ -45,27 +45,6 @@ function normalizeEventRow(row) {
   };
 }
 
-function normalizeEarningsRow(row) {
-  const company = row.companies;
-  const companyName = Array.isArray(company) ? company[0]?.name : company?.name;
-  const ticker = Array.isArray(company) ? company[0]?.ticker : company?.ticker;
-  const headline = ticker ? `${ticker} earnings` : `${companyName || 'Company'} earnings`;
-  const estimateBits = [];
-  if (row.eps_estimate != null) estimateBits.push(`EPS est. ${Number(row.eps_estimate).toFixed(2)}`);
-  if (row.revenue_estimate != null) estimateBits.push(`Rev est. $${(Number(row.revenue_estimate) / 1e9).toFixed(1)}B`);
-
-  return {
-    id: `earnings-${row.company_id}-${row.earnings_date}`,
-    date: row.earnings_date,
-    title: headline,
-    description: estimateBits.join(' • ') || 'Upcoming earnings report.',
-    type: 'earnings',
-    companyNames: companyName ? [companyName] : [],
-    url: null,
-    sourceLabel: 'Finnhub earnings',
-  };
-}
-
 export default function ConferenceCalendar() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,32 +52,14 @@ export default function ConferenceCalendar() {
   useEffect(() => {
     async function loadEvents() {
       const today = startOfToday();
-      const [eventsRes, earningsRes] = await Promise.all([
-        supabase
-          .from('events_calendar')
-          .select('*')
-          .gte('event_date', today)
-          .order('event_date', { ascending: true })
-          .limit(8),
-        supabase
-          .from('earnings_calendar')
-          .select('company_id, earnings_date, eps_estimate, revenue_estimate, companies(name, ticker)')
-          .gte('earnings_date', today)
-          .order('earnings_date', { ascending: true })
-          .limit(8),
-      ]);
+      const { data: eventsData } = await supabase
+        .from('events_calendar')
+        .select('*')
+        .gte('event_date', today)
+        .order('event_date', { ascending: true })
+        .limit(20);
 
-      const manualEvents = (eventsRes.data || []).map(normalizeEventRow);
-      const earningsEvents = (earningsRes.data || []).map(normalizeEarningsRow);
-
-      const seen = new Set();
-      const merged = [...manualEvents, ...earningsEvents]
-        .filter((row) => {
-          const key = `${row.type}-${row.title}-${row.date}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
+      const merged = (eventsData || []).map(normalizeEventRow)
         .sort((a, b) => new Date(a.date) - new Date(b.date))
         .slice(0, 8);
 
@@ -115,7 +76,7 @@ export default function ConferenceCalendar() {
         <Calendar size={20} className="text-accent-blue" />
         <div>
           <h3>Upcoming Events</h3>
-          <p>Earnings and tracked catalysts refreshed from live pipeline sources.</p>
+          <p>Actual conference, IPO, product, acquisition, and funding dates only. No announcement headlines.</p>
         </div>
       </div>
 
@@ -175,7 +136,7 @@ export default function ConferenceCalendar() {
 
           <div className="conference-event-footer">
             <Sparkles size={12} />
-            Falls back to earnings when custom events are sparse.
+            Actual event dates only. Use other panels for releases and news.
           </div>
         </div>
       )}

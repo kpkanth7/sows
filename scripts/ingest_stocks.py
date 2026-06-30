@@ -91,6 +91,42 @@ def get_companies_by_tier(tier: int):
     elif tier == 3: return TIER3_COMPANIES
     return []
 
+
+def persist_ipo_calendar(sb, ipo_rows):
+    """Persist IPO calendar rows into events_calendar so the UI can show them."""
+    if not ipo_rows:
+        return 0
+
+    payload = []
+    for row in ipo_rows:
+        event_date = row.get('date')
+        if not event_date:
+            continue
+        symbol = row.get('symbol') or row.get('companySymbol') or row.get('ticker')
+        name = row.get('name') or row.get('companyName') or symbol or 'IPO'
+        event_name = f"{name} IPO"
+        company_names = [name] if name else []
+        if symbol and symbol not in company_names:
+            company_names.append(symbol)
+
+        payload.append({
+            'event_name': event_name,
+            'company_names': company_names,
+            'event_date': event_date,
+            'event_type': 'ipo',
+            'description': 'Finnhub IPO calendar entry.',
+            'url': row.get('url'),
+            'is_upcoming': True,
+        })
+
+    for row in payload:
+        try:
+            sb.table('events_calendar').delete().eq('event_name', row['event_name']).eq('event_date', row['event_date']).execute()
+            sb.table('events_calendar').insert(row).execute()
+        except Exception as e:
+            logger.debug(f"Failed to persist IPO event {row['event_name']}: {e}")
+    return len(payload)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tier', type=int, choices=[1,2,3], default=1)
@@ -111,7 +147,9 @@ def main():
             ipo_cal = finnhub_client.ipo_calendar(_from=today, to=next_month)
             log_api_call(sb, 'finnhub')
             time.sleep(1.1)
-            logger.info(f"IPO calendar fetched: {len(ipo_cal.get('ipoCalendar', []))} items")
+            ipo_rows = ipo_cal.get('ipoCalendar', []) or []
+            persisted = persist_ipo_calendar(sb, ipo_rows)
+            logger.info(f"IPO calendar fetched: {len(ipo_rows)} items, persisted {persisted} events.")
         except Exception as e:
             logger.error(f"Finnhub IPO calendar error: {e}")
 
@@ -243,7 +281,7 @@ def main():
                         entities = extract_entities(headline, ALL_COMPANIES)
                         if name not in entities:
                             entities.append(name)
-                        sentiment = TextBlob(headline).sentiment.polarity
+                        sentiment = TextBlob(f"{headline} {article.get('summary') or ''}").sentiment.polarity
                         ts = article.get('datetime')
                         published = (
                             datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()

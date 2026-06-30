@@ -260,6 +260,14 @@ function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgrad
 }
 
 function buildInfluencerRows(influencers, recentSignals) {
+  const categoryPriority = {
+    software: 0,
+    ai_ml: 1,
+    startup: 2,
+    official_company: 3,
+    finance: 4,
+  };
+
   const byInfluencer = new Map();
   for (const signal of recentSignals || []) {
     if (!byInfluencer.has(signal.influencer_id)) {
@@ -282,12 +290,14 @@ function buildInfluencerRows(influencers, recentSignals) {
     const accuracy = inf.total_claims > 0
       ? Math.round((inf.correct_claims / inf.total_claims) * 100)
       : null;
+    const categoryRank = categoryPriority[inf.category] ?? 99;
 
     return {
       id: inf.id,
       name: inf.name,
       platform: inf.platform,
       category: inf.category,
+      categoryRank,
       trust_score: Number(inf.trust_score || 0),
       total_claims: inf.total_claims || 0,
       correct_claims: inf.correct_claims || 0,
@@ -299,6 +309,7 @@ function buildInfluencerRows(influencers, recentSignals) {
       recentTitles,
     };
   }).sort((a, b) => {
+    if (a.categoryRank !== b.categoryRank) return a.categoryRank - b.categoryRank;
     if (b.trust_score !== a.trust_score) return b.trust_score - a.trust_score;
     return b.recentSignalCount - a.recentSignalCount;
   });

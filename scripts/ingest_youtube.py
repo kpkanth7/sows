@@ -6,10 +6,11 @@ import time
 from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
+from textblob import TextBlob
 from db import get_client, check_quota, log_api_call, extract_entities, COMPANY_SYNONYMS
 from llm import generate_llm_content, strip_json_fence, has_llm_capacity
 from companies_config import YOUTUBE_CHANNELS, ALL_COMPANIES
-from ingest_news import calc_buzz
+from ingest_news import calc_buzz, sentiment_text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -176,12 +177,12 @@ def main():
                         except Exception as e:
                             logger.error(f"Gemini parse error for video {video_id}: {e}")
                             entities = extract_entities(f"{title}\n{transcript_text}", ALL_COMPANIES)
-                            sentiment = 0.0
+                            sentiment = TextBlob(sentiment_text(title, summary, transcript_text)).sentiment.polarity
                             detected_category = infer_youtube_category(category, title, transcript_text[:280])
                             llm_processed_flag = False
                     else:
                         entities = extract_entities(f"{title}\n{transcript_text}", ALL_COMPANIES)
-                        sentiment = 0.0
+                        sentiment = TextBlob(sentiment_text(title, summary, transcript_text)).sentiment.polarity
                         detected_category = infer_youtube_category(category, title, transcript_text[:280])
                         llm_processed_flag = False
                     

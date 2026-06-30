@@ -22,7 +22,7 @@ import httpx
 from textblob import TextBlob
 from db import get_client, record_health
 from companies_config import TIER1_COMPANIES, TIER2_COMPANIES, TIER3_COMPANIES
-from ingest_news import save_news, calc_buzz
+from ingest_news import save_news, calc_buzz, sentiment_text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ def main():
             date_filed = r.get('dateFiled') or r.get('date_filed')
             court = r.get('court') or r.get('court_id') or ''
             title = f"{case_name} ({court})" if court else case_name
-            sentiment = TextBlob(case_name).sentiment.polarity
+            sentiment = TextBlob(sentiment_text(case_name, title, court)).sentiment.polarity
             save_news(sb, {
                 'title': title,
                 'url': url,

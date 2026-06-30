@@ -52,7 +52,7 @@ export default function DarkHorsePanel() {
       <p className="text-muted text-sm mb-6">
         Tracked companies punching above their weight. Equal-weight composite of GitHub stars z-score,
         news volume z-score, analyst upgrade momentum, and combined insider + 7d stock momentum —
-        chosen to dilute single-source bias. Top 20 shown.
+        chosen to dilute single-source bias. This is a sample of the tracked universe, not the full market.
       </p>
       <div className="flex-col gap-3">
         {rows.map(r => {

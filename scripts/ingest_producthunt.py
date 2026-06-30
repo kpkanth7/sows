@@ -3,7 +3,8 @@ import httpx
 import logging
 from db import get_client, extract_entities
 from companies_config import ALL_COMPANIES
-from ingest_news import calc_buzz, save_news
+from ingest_news import calc_buzz, save_news, sentiment_text
+from textblob import TextBlob
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ def main():
             url = node['url']
             
             entities = extract_entities(title, ALL_COMPANIES)
+            sentiment = TextBlob(sentiment_text(title, node.get('tagline'))).sentiment.polarity
             
             news_item = {
                 'title': title,
@@ -95,8 +97,8 @@ def main():
                 'source_credibility_tier': 3,
                 'category': 'release',
                 'entity_names': entities,
-                'sentiment': 0.5,
-                'buzz_score': calc_buzz(0.5, entities),
+                'sentiment': sentiment,
+                'buzz_score': calc_buzz(sentiment, entities),
                 'published_at': node['createdAt'],
                 'hn_score': node.get('votesCount', 0)
             }

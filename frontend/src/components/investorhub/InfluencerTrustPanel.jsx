@@ -71,6 +71,11 @@ function linkedItems(activity) {
     .slice(0, 3);
 }
 
+function categoryLabel(category) {
+  if (!category) return 'uncategorized';
+  return category.replaceAll('_', ' ');
+}
+
 export default function InfluencerTrustPanel({ rows = [], recentActivity = [] }) {
   if (rows.length === 0) {
     return (
@@ -108,6 +113,7 @@ export default function InfluencerTrustPanel({ rows = [], recentActivity = [] })
                 <h3 className="investor-hub-card-title">{row.name || row.handle || 'Unknown influencer'}</h3>
                 <div className="flex items-center gap-2 flex-wrap mt-1">
                   {row.platform ? <span className="badge badge-gray">{row.platform}</span> : null}
+                  {row.category ? <span className="badge badge-gray">{categoryLabel(row.category)}</span> : null}
                   {row.handle ? <span className="badge badge-gray">@{row.handle.replace(/^@/, '')}</span> : null}
                   <span className={`badge ${trustTone(row.trust_score)}`}>Trust {trustScore}</span>
                 </div>

@@ -11,8 +11,10 @@ import { ArrowLeft, Briefcase, Grid2X2, Layers3, List } from 'lucide-react';
 // to the end. Tiles COLORED by 24h change (green/red, neutral gray for null).
 // Filters: sector pills + region pills + public/private toggle, AND-combined.
 
-const VISIBLE_TILE_COUNT = 3;
-const MAX_MISC_VISUAL_SHARE = 0.34;
+const VISIBLE_TILE_COUNT = 4;
+const MISC_VISUAL_SHARE = 0.125;
+const SIZE_COMPRESSION_POWER = 1.05;
+const SIZE_OFFSET = 1;
 
 // Map a 24h % change to a richer market-map color. Magnitude is clamped so
 // outliers stay readable while still showing direction clearly.
@@ -49,20 +51,29 @@ function fmtMoney(value) {
   return `$${Math.round(value).toLocaleString()}`;
 }
 
+function compressMapSize(value) {
+  if (!value || Number.isNaN(value) || value <= 0) return 0;
+  return Math.pow(Math.log10(value + SIZE_OFFSET), SIZE_COMPRESSION_POWER);
+}
+
 function buildMapLevel(items, depth) {
   const start = depth * VISIBLE_TILE_COUNT;
   const levelItems = items.slice(start);
   const visible = levelItems.slice(0, VISIBLE_TILE_COUNT);
   const tail = levelItems.slice(VISIBLE_TILE_COUNT);
 
-  if (!tail.length) return visible;
+  const visibleSized = visible.map(item => ({
+    ...item,
+    size: compressMapSize(item.rawSize || item.size),
+  }));
 
-  const tailSize = tail.reduce((sum, item) => sum + item.size, 0);
-  const visibleSize = visible.reduce((sum, item) => sum + item.size, 0);
-  const maxTailVisualSize = visibleSize
-    ? visibleSize * (MAX_MISC_VISUAL_SHARE / (1 - MAX_MISC_VISUAL_SHARE))
-    : tailSize;
-  const tailVisualSize = Math.min(tailSize, maxTailVisualSize);
+  if (!tail.length) return visibleSized;
+
+  const tailSize = tail.reduce((sum, item) => sum + (item.rawSize || item.size || 0), 0);
+  const visibleSize = visibleSized.reduce((sum, item) => sum + item.size, 0);
+  const tailVisualSize = visibleSize
+    ? Math.max(visibleSize * (MISC_VISUAL_SHARE / (1 - MISC_VISUAL_SHARE)), 0.001)
+    : 1;
   const gainers = tail.filter(item => item.change > 0).length;
   const losers = tail.filter(item => item.change < 0).length;
   const avgChangeValues = tail
@@ -76,10 +87,11 @@ function buildMapLevel(items, depth) {
     : `${fmtMoney(tailSize)} combined`;
 
   return [
-    ...visible,
+    ...visibleSized,
     {
       name: 'Miscellaneous',
       size: tailVisualSize,
+      rawSize: tailSize,
       change: avgChange,
       color: '#33415f',
       isCluster: true,
@@ -136,8 +148,8 @@ function TreemapTile(props) {
   const labelFontSize = isCluster
     ? Math.min(24, Math.max(16, width / 11))
     : Math.max(9.5, Math.min(fontSize, (width - 24) / (longestLine * 0.62), height / (labelLines.length * 3.1)));
-  const showLabel = isCluster || (width > 62 && height > 42);
-  const showDetails = isCluster ? width > 120 && height > 76 : width > 92 && height > 68;
+  const showLabel = isCluster || (width > 56 && height > 40);
+  const showDetails = isCluster ? width > 120 && height > 76 : width > 84 && height > 64;
   const showFullName = !isCluster && showDetails && data.fullName && data.fullName !== name;
   const handleClick = () => {
     if (isCluster) {
@@ -467,6 +479,7 @@ export default function CompanyDashboard() {
           name: c.ticker || c.name,
           fullName,
           size: c.market_cap || pendingSize,
+          rawSize: c.market_cap || pendingSize,
           change: c.change_pct_24h,
           color: changeToColor(c.change_pct_24h),
           company: c,
@@ -497,6 +510,7 @@ export default function CompanyDashboard() {
           name: c.name,
           fullName,
           size: c.last_valuation,
+          rawSize: c.last_valuation,
           change: null,
           color: privateValuationColor(c.last_valuation),
           company: c,

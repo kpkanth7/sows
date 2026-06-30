@@ -38,7 +38,7 @@ export default function DigestPanel() {
     <div>
       <p className="text-muted text-sm mb-6">
         LLM-synthesized "what an investor should know" — built daily from last-24h news, SEC 8-Ks,
-        insider trades, and earnings signals.
+        social/community signals, insider trades, dark-horse movers, and earnings catalysts.
       </p>
 
       <div className="card glass-panel mb-6 digest-panel-latest">

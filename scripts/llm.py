@@ -27,7 +27,7 @@ OPENAI_COMPATIBLE = {
     "groq": {
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "env": "GROQ_API_KEY",
-        "default_model": "llama-3.3-70b-versatile",
+        "default_model": "openai/gpt-oss-120b",
     },
     "cerebras": {
         "url": "https://api.cerebras.ai/v1/chat/completions",

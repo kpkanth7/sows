@@ -24,7 +24,7 @@ from llm import generate_llm_content, strip_json_fence, has_llm_capacity
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-NEWS_LIMIT = 20
+NEWS_LIMIT = 40
 INSIDER_THRESHOLD = 10_000
 
 
@@ -36,14 +36,71 @@ def _fetch_signals(sb):
     week_back = (now - timedelta(days=7)).date().isoformat()
     today = now.date().isoformat()
 
-    # Top buzz news.
+    # Broad news slice: keep the top feed plus category-specific slices so the
+    # digest is not dominated by one source family.
     news_res = (
         sb.table('news_items')
-          .select('title, entity_names, source, category, buzz_v2, sentiment')
+          .select('title, summary, entity_names, source, source_type, category, buzz_v2, sentiment, published_at')
           .gte('ingested_at', since)
           .not_.is_('buzz_v2', None)
           .order('buzz_v2', desc=True)
           .limit(NEWS_LIMIT)
+          .execute()
+    )
+
+    controversy_res = (
+        sb.table('news_items')
+          .select('title, summary, entity_names, source, source_type, category, buzz_v2, sentiment, published_at')
+          .gte('ingested_at', since)
+          .in_('category', ['controversy', 'ma', 'earnings'])
+          .order('ingested_at', desc=True)
+          .limit(12)
+          .execute()
+    )
+
+    release_res = (
+        sb.table('news_items')
+          .select('title, summary, entity_names, source, source_type, category, buzz_v2, sentiment, published_at')
+          .gte('ingested_at', since)
+          .in_('category', ['release', 'ai', 'opensource'])
+          .order('buzz_v2', desc=True)
+          .limit(12)
+          .execute()
+    )
+
+    research_res = (
+        sb.table('news_items')
+          .select('title, summary, entity_names, source, source_type, category, buzz_v2, sentiment, published_at')
+          .gte('ingested_at', since)
+          .eq('category', 'research')
+          .order('buzz_v2', desc=True)
+          .limit(12)
+          .execute()
+    )
+
+    conference_res = (
+        sb.table('news_items')
+          .select('title, summary, entity_names, source, source_type, category, buzz_v2, sentiment, published_at')
+          .gte('ingested_at', since)
+          .in_('category', ['conference', 'ipo'])
+          .order('ingested_at', desc=True)
+          .limit(12)
+          .execute()
+    )
+
+    community_res = (
+        sb.table('community_signals')
+          .select('source, entity_name, post_title, post_url, post_score, comment_count, sentiment, captured_at')
+          .gte('captured_at', since)
+          .order('captured_at', desc=True)
+          .limit(20)
+          .execute()
+    )
+
+    dark_horse_res = (
+        sb.table('dark_horse_movers')
+          .select('rank, score, reasons, components, companies(name, ticker)')
+          .limit(10)
           .execute()
     )
 
@@ -91,18 +148,24 @@ def _fetch_signals(sb):
 
     return {
         'news': news_res.data or [],
+        'controversy': controversy_res.data or [],
+        'release': release_res.data or [],
+        'research': research_res.data or [],
+        'conference': conference_res.data or [],
+        'community': community_res.data or [],
         'insider': insider,
         'sec': sec_res.data or [],
         'upcoming_earn': up_res.data or [],
         'recent_earn': rec_res.data or [],
+        'dark_horse': dark_horse_res.data or [],
     }
 
 
 def _build_prompt(signals: dict) -> str:
     lines = [
         "You are a senior tech investor analyst.",
-        "Synthesize the following last-24h signals into ONE concise paragraph (4-6 sentences) titled \"Today's tech-investor digest\".",
-        "Focus: what changed, what matters, who's moving, what to watch next.",
+        "Synthesize the following last-24h signals into ONE concise paragraph (5-8 sentences) titled \"Today's tech-investor digest\".",
+        "Focus: what changed, what matters, who's moving, what to watch next, and where the signal is concentrated.",
         "Do NOT make up numbers. Reference only the signals shown.",
         "After the paragraph, return strict JSON with this shape:",
         '{"summary":"...the paragraph...","top_tickers":["NVDA","MSFT",...]}',
@@ -119,6 +182,47 @@ def _build_prompt(signals: dict) -> str:
         for s in signals['sec']:
             ents = ','.join((s.get('entity_names') or [])[:2])
             lines.append(f"- {s['title']} (entities: {ents})")
+
+    if signals['controversy']:
+        lines.append("\n=== CONTROVERSIES / M&A / EARNINGS PRESSURE ===")
+        for n in signals['controversy'][:12]:
+            ents = ','.join((n.get('entity_names') or [])[:3])
+            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+
+    if signals['release']:
+        lines.append("\n=== RELEASES / AI / OPEN SOURCE ===")
+        for n in signals['release'][:12]:
+            ents = ','.join((n.get('entity_names') or [])[:3])
+            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+
+    if signals['research']:
+        lines.append("\n=== RESEARCH / PAPERS ===")
+        for n in signals['research'][:12]:
+            ents = ','.join((n.get('entity_names') or [])[:3])
+            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+
+    if signals['conference']:
+        lines.append("\n=== CONFERENCES / IPOS ===")
+        for n in signals['conference'][:12]:
+            ents = ','.join((n.get('entity_names') or [])[:3])
+            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+
+    if signals['community']:
+        lines.append("\n=== COMMUNITY SIGNALS (Reddit / Hacker News) ===")
+        for c in signals['community']:
+            lines.append(
+                f"- {c.get('source') or '?'} · {c.get('post_title') or '?'} "
+                f"(entity: {c.get('entity_name') or '?'}; sentiment={c.get('sentiment')})"
+            )
+
+    if signals['dark_horse']:
+        lines.append("\n=== DARK-HORSE MOVERS ===")
+        for d in signals['dark_horse']:
+            co = d.get('companies') or {}
+            lines.append(
+                f"- #{d.get('rank')} {co.get('ticker') or co.get('name') or '?'} "
+                f"score={d.get('score')} reasons={', '.join(d.get('reasons') or [])}"
+            )
 
     if signals['insider']:
         lines.append("\n=== NOTABLE INSIDER TRADES (last 24h, >=10K shares) ===")
@@ -183,7 +287,12 @@ def _parse_digest_response(text: str) -> dict:
 
 
 def main():
-    sb = get_client()
+    try:
+        sb = get_client()
+    except Exception as e:
+        logger.warning(f"Supabase unavailable — skipping digest: {e}")
+        return {'status': 'partial', 'detail': f'Supabase unavailable; digest skipped: {e}'[:500]}
+
     if not has_llm_capacity(sb, 1):
         logger.warning("LLM quota exhausted — skipping digest.")
         return {'status': 'partial', 'detail': 'LLM quota exhausted; digest skipped.'}
@@ -191,7 +300,9 @@ def main():
     signals = _fetch_signals(sb)
     source_count = (len(signals['news']) + len(signals['insider'])
                     + len(signals['sec']) + len(signals['upcoming_earn'])
-                    + len(signals['recent_earn']))
+                    + len(signals['recent_earn']) + len(signals['controversy'])
+                    + len(signals['release']) + len(signals['research']) + len(signals['conference'])
+                    + len(signals['community']) + len(signals['dark_horse']))
     if source_count == 0:
         logger.warning("No signals in last 24h — skipping digest.")
         return {'status': 'partial', 'detail': 'No signals found in the last 24h; digest skipped.'}
@@ -224,7 +335,13 @@ def main():
 if __name__ == '__main__':
     try:
         result = main() or {'status': 'ok', 'detail': None}
-        record_health(get_client(), 'generate_daily_digest', result['status'], result.get('detail'))
+        try:
+            record_health(get_client(), 'generate_daily_digest', result['status'], result.get('detail'))
+        except Exception as e:
+            logger.warning(f"Could not record digest health: {e}")
     except Exception as e:
-        record_health(get_client(), 'generate_daily_digest', 'error', str(e))
+        try:
+            record_health(get_client(), 'generate_daily_digest', 'error', str(e))
+        except Exception as record_err:
+            logger.warning(f"Could not record digest error health: {record_err}")
         raise

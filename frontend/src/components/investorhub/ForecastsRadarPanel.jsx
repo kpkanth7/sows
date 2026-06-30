@@ -1,4 +1,12 @@
+import { useState } from 'react';
 import ForecastBadge from '../ForecastBadge';
+
+const SECTION_NAV = [
+  { id: 'momentum-leaders', label: 'Momentum Leaders' },
+  { id: 'risk-build-up', label: 'Risk Build-Up' },
+  { id: 'catalysts-ahead', label: 'Catalysts Ahead' },
+  { id: 'private-watchlist', label: 'Private Watchlist' },
+];
 
 function metricLabel(item) {
   if (item.priority != null) return `Priority ${item.priority}`;
@@ -79,7 +87,7 @@ function CompanyCard({ item, emptyCopy }) {
 
 function Section({ title, rows, emptyCopy }) {
   return (
-    <section>
+    <section className="investor-hub-forecast-section">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h3 className="font-bold">{title}</h3>
         <span className="badge badge-gray">{rows.length}</span>
@@ -116,28 +124,56 @@ export default function ForecastsRadarPanel({
   catalystsAhead = [],
   privateWatchlist = [],
 }) {
+  const [activeSection, setActiveSection] = useState('momentum-leaders');
+
+  const sectionMap = {
+    'momentum-leaders': {
+      title: 'Momentum Leaders',
+      rows: momentumLeaders,
+      emptyCopy: 'No momentum leaders supplied.',
+    },
+    'risk-build-up': {
+      title: 'Risk Build-Up',
+      rows: riskBuildUp,
+      emptyCopy: 'No risk build-up entries supplied.',
+    },
+    'catalysts-ahead': {
+      title: 'Catalysts Ahead',
+      rows: catalystsAhead,
+      emptyCopy: 'No upcoming catalysts supplied.',
+    },
+    'private-watchlist': {
+      title: 'Private Watchlist',
+      rows: privateWatchlist,
+      emptyCopy: 'No private watchlist entries supplied.',
+    },
+  };
+
+  const active = sectionMap[activeSection] || sectionMap['momentum-leaders'];
+
   return (
     <div className="flex-col gap-6">
-      <Section
-        title="Momentum Leaders"
-        rows={momentumLeaders}
-        emptyCopy="No momentum leaders supplied."
-      />
-      <Section
-        title="Risk Build-Up"
-        rows={riskBuildUp}
-        emptyCopy="No risk build-up entries supplied."
-      />
-      <Section
-        title="Catalysts Ahead"
-        rows={catalystsAhead}
-        emptyCopy="No upcoming catalysts supplied."
-      />
-      <Section
-        title="Private Watchlist"
-        rows={privateWatchlist}
-        emptyCopy="No private watchlist entries supplied."
-      />
+      <div className="investor-hub-section-tabs" role="tablist" aria-label="Forecast sections">
+        {SECTION_NAV.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            className={`nav-link tab-button investor-hub-subtab ${activeSection === id ? 'active' : ''}`}
+            onClick={() => setActiveSection(id)}
+            role="tab"
+            aria-selected={activeSection === id}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="investor-hub-section-frame">
+        <Section
+          title={active.title}
+          rows={active.rows}
+          emptyCopy={active.emptyCopy}
+        />
+      </div>
     </div>
   );
 }

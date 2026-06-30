@@ -31,22 +31,37 @@ def _chunks(seq, n):
         yield block
 
 
-def fetch_trending(sb, headers):
-    """Single REST search for repos created in the last 7 days, sorted by stars."""
+def _search_repositories(sb, headers, query, limit=25):
+    """Search GitHub repos with quota accounting and return up to `limit` items."""
     if not check_quota(sb, 'github', 1):
-        return
+        return []
     try:
-        one_week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime('%Y-%m-%d')
-        url = f"https://api.github.com/search/repositories?q=created:>{one_week_ago}&sort=stars&order=desc"
+        url = f"https://api.github.com/search/repositories?q={query}&sort=stars&order=desc"
         resp = httpx.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
         log_api_call(sb, 'github', 1)
+        return (resp.json().get('items') or [])[:limit]
     except Exception as e:
-        logger.error(f"github trending fetch error: {e}")
-        return
+        logger.error(f"github search error for query={query!r}: {e}")
+        return []
 
-    items = resp.json().get('items', [])
-    for item in items[:30]:
+
+def fetch_trending(sb, headers):
+    """Surface fast-rising repos and older high-star projects."""
+    one_week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime('%Y-%m-%d')
+    recent_items = _search_repositories(sb, headers, f"created:>{one_week_ago}", limit=25)
+    popular_items = _search_repositories(sb, headers, "stars:>1000", limit=25)
+
+    merged = []
+    seen = set()
+    for item in recent_items + popular_items:
+        full_name = item.get('full_name')
+        if not full_name or full_name in seen:
+            continue
+        seen.add(full_name)
+        merged.append(item)
+
+    for item in merged[:30]:
         repo_name = item['full_name']
         stars = item['stargazers_count']
         repo_url = item['html_url']

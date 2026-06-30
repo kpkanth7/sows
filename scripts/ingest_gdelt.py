@@ -14,7 +14,7 @@ import httpx
 from textblob import TextBlob
 from db import get_client, extract_entities
 from companies_config import ALL_COMPANIES
-from ingest_news import save_news, calc_buzz
+from ingest_news import save_news, calc_buzz, sentiment_text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ def main():
         if not entities:
             continue
         matched += 1
-        sentiment = TextBlob(title).sentiment.polarity
+        sentiment = TextBlob(sentiment_text(title, art.get("snippet"), art.get("summary"), art.get("sourceCountry"))).sentiment.polarity
         save_news(sb, {
             'title': title,
             'url': url,
