@@ -6,7 +6,12 @@ import feedparser
 from textblob import TextBlob
 from datetime import datetime, timedelta, timezone
 from db import get_client, check_quota, log_api_call, extract_entities
-from companies_config import ALL_COMPANIES, RSS_FEEDS
+from companies_config import (
+    ALL_COMPANIES,
+    RSS_FEEDS,
+    OFFICIAL_COMPANY_RELEASE_FEEDS,
+    OFFICIAL_COMPANY_SOURCE_REGISTRY,
+)
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +58,53 @@ def compute_title_hash(title: str) -> str:
     if not words:
         return compute_hash((title or '').lower())
     return hashlib.md5(' '.join(words).encode('utf-8')).hexdigest()
+
+
+def sentiment_text(*parts) -> str:
+    """Flatten and clean multiple text fragments for sentiment analysis."""
+    cleaned = []
+    for part in parts:
+        if not part:
+            continue
+        if isinstance(part, list):
+            for item in part:
+                if isinstance(item, dict):
+                    cleaned.append(str(item.get('value') or item.get('content') or ''))
+                else:
+                    cleaned.append(str(item))
+            continue
+        text = str(part)
+        text = re.sub(r'<[^>]+>', ' ', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        if text:
+            cleaned.append(text)
+    return ' '.join(cleaned).strip()
+
+
+def infer_rss_category(title: str, feed_url: str = "") -> str:
+    """Fast keyword classifier for RSS/news headlines.
+
+    This keeps release / conference / IPO / M&A / research items visible before
+    the later LLM pass runs.
+    """
+    text = f"{title}\n{feed_url}".lower()
+    if any(term in text for term in ['ipo', 'public offering', 'listing', 'went public']):
+        return 'ipo'
+    if any(term in text for term in ['acquire', 'acquisition', 'merge', 'merger', 'm&a']):
+        return 'ma'
+    if any(term in text for term in ['lawsuit', 'controv', 'scandal', 'fraud', 'breach', 'investigation']):
+        return 'controversy'
+    if any(term in text for term in ['conference', 'keynote', 'summit', 'devday', 'build ', 'google i/o', 'wwdc', 're:invent', 'ignite', 'gdc']):
+        return 'conference'
+    if any(term in text for term in ['earnings', 'guidance', 'revenue', 'margin', 'quarter', 'q1 ', 'q2 ', 'q3 ', 'q4 ']):
+        return 'earnings'
+    if any(term in text for term in ['research', 'paper', 'benchmark', 'arxiv', 'study', 'model card']):
+        return 'research'
+    if any(term in text for term in ['open source', 'opensource', 'github', 'release', 'launch', 'released', 'announced', 'announcement', 'debut', 'rollout', 'preview', 'beta', 'unveil']):
+        return 'release'
+    if any(term in text for term in ['ai', 'llm', 'model', 'agent', 'inference', 'chip', 'gpu']):
+        return 'ai'
+    return 'other'
 
 def save_news(sb, item):
     try:
@@ -179,7 +231,7 @@ def fetch_hn(sb):
             entities = extract_entities(title, ALL_COMPANIES)
             if not entities:
                 continue
-            sentiment = TextBlob(title).sentiment.polarity
+            sentiment = TextBlob(sentiment_text(title)).sentiment.polarity
             
             item = {
                 'title': title,
@@ -201,27 +253,40 @@ def fetch_hn(sb):
 
 def fetch_rss(sb):
     logger.info("Fetching RSS")
-    for feed_url in RSS_FEEDS:
+    company_source_lookup = {
+        url: company
+        for company, spec in OFFICIAL_COMPANY_SOURCE_REGISTRY.items()
+        for url in (*spec.get('feeds', []), *spec.get('pages', []))
+    }
+    seen = set()
+    for feed_url in RSS_FEEDS + OFFICIAL_COMPANY_RELEASE_FEEDS + list(company_source_lookup.keys()):
+        if feed_url in seen:
+            continue
+        seen.add(feed_url)
         try:
             feed = feedparser.parse(feed_url)
+            official_company = company_source_lookup.get(feed_url)
             for entry in feed.entries[:30]:
                 title = entry.title
                 link = entry.link
                 
                 entities = extract_entities(title, ALL_COMPANIES)
+                if official_company and official_company not in entities:
+                    entities.append(official_company)
                 if not entities:
                     continue
-                sentiment = TextBlob(title).sentiment.polarity
+                sentiment = TextBlob(sentiment_text(title, entry.get('summary'), entry.get('description'), entry.get('content'))).sentiment.polarity
                 
                 item = {
                     'title': title,
                     'url': link,
-                    'source': 'rss',
-                    'source_type': 'news',
-                    'source_credibility_tier': 2,
+                    'source': official_company or 'rss',
+                    'source_type': 'official_company' if official_company else 'news',
+                    'source_credibility_tier': 1 if official_company else 2,
                     'entity_names': entities,
                     'sentiment': sentiment,
-                    'buzz_score': calc_buzz(sentiment, entities)
+                    'buzz_score': calc_buzz(sentiment, entities),
+                    'category': infer_rss_category(title, feed_url if not official_company else official_company),
                 }
                 save_news(sb, item)
         except Exception as e:
@@ -274,7 +339,7 @@ def fetch_thenewsapi(sb):
                     continue
                     
                 matched_count += 1
-                sentiment = TextBlob(title).sentiment.polarity
+                sentiment = TextBlob(sentiment_text(title, article.get('description'), article.get('snippet'))).sentiment.polarity
                 
                 item = {
                     'title': title,
@@ -318,7 +383,7 @@ def fetch_devto(sb):
             link = article.get('url')
             
             entities = extract_entities(title, ALL_COMPANIES)
-            sentiment = TextBlob(title).sentiment.polarity
+            sentiment = TextBlob(sentiment_text(title, article.get('summary'), article.get('description'), article.get('body'))).sentiment.polarity
             
             item = {
                 'title': title,

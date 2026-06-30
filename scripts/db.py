@@ -1,14 +1,32 @@
 import os
 import logging
 from datetime import date
-from supabase import create_client, Client
+from pathlib import Path
 import re
 from dotenv import load_dotenv
+import sys
 
+ROOT_ENV = Path(__file__).resolve().parents[1] / ".env"
+if ROOT_ENV.exists():
+    load_dotenv(ROOT_ENV)
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# The repository contains a `supabase/` directory for schema files, which can
+# shadow the pip package when the repo root is on sys.path. Temporarily remove
+# the repo root so we import the actual Supabase client library from site-packages.
+_repo_root = Path(__file__).resolve().parents[1]
+_original_sys_path = sys.path[:]
+try:
+    sys.path = [
+        p for p in sys.path
+        if Path(p or '.').resolve() != _repo_root
+    ]
+    from supabase import create_client, Client
+finally:
+    sys.path = _original_sys_path
 
 LLM_QUOTA_DEFAULTS = {
     "groq": {"daily_limit": 1000, "per_min_limit": 30},
@@ -21,7 +39,7 @@ def get_client() -> Client:
     supabase_url = os.environ.get('SUPABASE_URL', '')
     supabase_key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
     if not supabase_url or not supabase_key:
-        logger.warning("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set")
+        raise RuntimeError("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set")
     return create_client(supabase_url, supabase_key)
 
 def check_quota(sb: Client, source_name: str, cost: int = 1) -> bool:

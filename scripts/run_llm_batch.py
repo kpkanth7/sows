@@ -5,13 +5,21 @@ import time
 from datetime import datetime, timedelta, timezone
 from db import get_client
 from llm import generate_llm_content, strip_json_fence, has_llm_capacity, get_primary_provider
-from companies_config import TIER1_COMPANIES
+from companies_config import TIER1_COMPANIES, TIER2_COMPANIES, TIER3_COMPANIES
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Phase 2.13: precomputed set of mega-cap names so any T1 mention boosts buzz_v2.
 TIER1_NAMES = {c['name'] for c in TIER1_COMPANIES}
+TIER2_NAMES = {c['name'] for c in TIER2_COMPANIES}
+TIER3_NAMES = {c['name'] for c in TIER3_COMPANIES}
+
+ENTITY_TIER_PRIORITY = {
+    **{name: 1 for name in TIER1_NAMES},
+    **{name: 2 for name in TIER2_NAMES},
+    **{name: 3 for name in TIER3_NAMES},
+}
 
 
 def compute_buzz_v2(item: dict, relevance: float) -> float:
@@ -44,7 +52,12 @@ def compute_buzz_v2(item: dict, relevance: float) -> float:
         recency = 50.0  # unknown publish time -> neutral
 
     base = 0.5 * relevance + 0.2 * cred + 0.15 * hn + 0.15 * recency
-    boost = 1.2 if set(item.get('entity_names') or []) & TIER1_NAMES else 1.0
+    entity_tiers = [ENTITY_TIER_PRIORITY.get(entity) for entity in (item.get('entity_names') or []) if ENTITY_TIER_PRIORITY.get(entity)]
+    if entity_tiers:
+        best_tier = min(entity_tiers)
+        boost = {1: 1.25, 2: 1.12, 3: 1.0}.get(best_tier, 1.0)
+    else:
+        boost = 1.0
     return round(min(100.0, base * boost), 2)
 
 
@@ -54,7 +67,7 @@ def process_news_batch(sb, items):
 
     prompt = (
         "Analyze the following news items. For each, return a JSON object with "
-        "'category' (ai/release/ma/ipo/controversy/conference/opensource/earnings/other), "
+        "'category' (ai/release/ma/ipo/controversy/conference/opensource/earnings/research/other), "
         "'entities' (list of company names), 'sentiment' (-1.0 to 1.0), "
         "'summary' (1 sentence), 'hype_score' (0-100), 'reality_score' (0-100), "
         "and 'relevance' (0-100, how much a tech investor should care about this headline "

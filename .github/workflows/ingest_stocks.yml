@@ -5,9 +5,9 @@ name: Ingest Stocks (Tiered)
 # gating and no wasted runner minutes spinning up jobs that immediately skip.
 on:
   schedule:
-    - cron: "*/15 * * * *"   # Tier 1
-    - cron: "*/30 * * * *"   # Tier 2 (every 30 min) — bumped from hourly in Phase 2.11
-    - cron: "0 */2 * * *"    # Tier 3 (every 2 hours)
+    - cron: "0 */3 * * *"    # Tier 1
+    - cron: "0 */6 * * *"    # Tier 2
+    - cron: "0 3,9,15,21 * * *"    # Tier 3 (staggered, still every 6 hours)
   workflow_dispatch:
     inputs:
       tier:
@@ -20,10 +20,10 @@ env:
 
 jobs:
   tier1:
-    name: Tier 1 Stocks (15min)
+    name: Tier 1 Stocks (3hr)
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    if: ${{ github.event.schedule == '*/15 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '1') }}
+    if: ${{ github.event.schedule == '0 */3 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '1') }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -51,10 +51,10 @@ jobs:
           python scripts/ingest_stocks.py --tier 1
 
   tier2:
-    name: Tier 2 Stocks (hourly)
+    name: Tier 2 Stocks (6hr)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event.schedule == '*/30 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '2') }}
+    if: ${{ github.event.schedule == '0 */6 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '2') }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -80,10 +80,10 @@ jobs:
           python scripts/ingest_stocks.py --tier 2
 
   tier3:
-    name: Tier 3 Stocks (2hr)
+    name: Tier 3 Stocks (6hr)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: ${{ github.event.schedule == '0 */2 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '3') }}
+    if: ${{ github.event.schedule == '0 3,9,15,21 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == '3') }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6

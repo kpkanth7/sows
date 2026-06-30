@@ -6,29 +6,34 @@ TIER1_COMPANIES = [
     {'name': 'Google', 'ticker': 'GOOGL', 'is_private': False, 'sector': 'Technology', 'is_ai_company': True, 'github_org': 'google', 'region': 'US'},
     {'name': 'Microsoft', 'ticker': 'MSFT', 'is_private': False, 'sector': 'Technology', 'is_ai_company': True, 'github_org': 'microsoft', 'region': 'US'},
     {'name': 'Apple', 'ticker': 'AAPL', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'apple', 'region': 'US'},
-    {'name': 'OpenAI', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'openai', 'last_valuation': 852000000000, 'valuation_source': 'Private round (2026)', 'region': 'US'}
-]
-
-TIER2_COMPANIES = [
-    # --- existing US/global large-cap ---
+    {'name': 'OpenAI', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'openai', 'last_valuation': 852000000000, 'valuation_source': 'Private round (2026)', 'region': 'US'},
     {'name': 'Meta', 'ticker': 'META', 'is_private': False, 'sector': 'Technology', 'is_ai_company': True, 'github_org': 'facebook', 'region': 'US'},
     {'name': 'Amazon', 'ticker': 'AMZN', 'is_private': False, 'sector': 'Technology', 'is_ai_company': True, 'github_org': 'amzn', 'region': 'US'},
     {'name': 'Tesla', 'ticker': 'TSLA', 'is_private': False, 'sector': 'Robotics', 'is_ai_company': True, 'github_org': 'teslamotors', 'region': 'US'},
     {'name': 'Anthropic', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'anthropics', 'last_valuation': 965000000000, 'valuation_source': 'Series H (May 2026)', 'region': 'US'},
-    {'name': 'Mistral', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'mistralai', 'last_valuation': 14000000000, 'valuation_source': 'Series C (Sep 2025)', 'region': 'Europe'},
-    {'name': 'xAI', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'xai', 'last_valuation': None, 'valuation_source': 'Merged into SpaceX (Feb 2026)', 'region': 'US'},
-    {'name': 'Perplexity', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'perplexity-ai', 'last_valuation': 9000000000, 'valuation_source': 'Funding round (Jan 2025)', 'region': 'US'},
     {'name': 'Salesforce', 'ticker': 'CRM', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'salesforce', 'region': 'US'},
-    {'name': 'Intel', 'ticker': 'INTC', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'intel', 'region': 'US'},
-    {'name': 'AMD', 'ticker': 'AMD', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'ROCm', 'region': 'US'},
-    {'name': 'TSMC', 'ticker': 'TSM', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': None, 'region': 'Taiwan'},
+    {'name': 'Adobe', 'ticker': 'ADBE', 'is_private': False, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'adobe', 'region': 'US'},
+    {'name': 'ServiceNow', 'ticker': 'NOW', 'is_private': False, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'ServiceNow', 'region': 'US'},
     {'name': 'Palantir', 'ticker': 'PLTR', 'is_private': False, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'palantir', 'region': 'US'},
     {'name': 'Snowflake', 'ticker': 'SNOW', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'snowflakedb', 'region': 'US'},
     {'name': 'Databricks', 'ticker': None, 'is_private': True, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'databricks', 'last_valuation': 134000000000, 'valuation_source': 'Series L (Dec 2025)', 'region': 'US'},
-    {'name': 'Arm', 'ticker': 'ARM', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'ARM-software', 'region': 'Europe'},
-    {'name': 'Cloudflare', 'ticker': 'NET', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'cloudflare', 'region': 'US'},
-    {'name': 'MongoDB', 'ticker': 'MDB', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'mongodb', 'region': 'US'},
     {'name': 'HuggingFace', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'huggingface', 'last_valuation': 4500000000, 'valuation_source': 'Series D (Aug 2023)', 'region': 'US'},
+    {'name': 'Mistral', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'mistralai', 'last_valuation': 14000000000, 'valuation_source': 'Series C (Sep 2025)', 'region': 'Europe'},
+    {'name': 'Cloudflare', 'ticker': 'NET', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'cloudflare', 'region': 'US'},
+    {'name': 'Broadcom', 'ticker': 'AVGO', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': True, 'github_org': 'Broadcom', 'region': 'US'},
+    {'name': 'AMD', 'ticker': 'AMD', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'ROCm', 'region': 'US'},
+    {'name': 'Intel', 'ticker': 'INTC', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'intel', 'region': 'US'},
+    {'name': 'Stripe', 'ticker': None, 'is_private': True, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'stripe', 'last_valuation': 91500000000, 'valuation_source': 'Tender offer (2025)', 'region': 'US'},
+    {'name': 'CoreWeave', 'ticker': 'CRWV', 'is_private': False, 'sector': 'AI Infrastructure', 'is_ai_company': True, 'github_org': 'coreweave', 'last_valuation': None, 'valuation_source': 'IPO (2025)', 'region': 'US'}
+]
+
+TIER2_COMPANIES = [
+    # --- existing US/global large-cap ---
+    {'name': 'xAI', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'xai', 'last_valuation': None, 'valuation_source': 'Merged into SpaceX (Feb 2026)', 'region': 'US'},
+    {'name': 'Perplexity', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'perplexity-ai', 'last_valuation': 9000000000, 'valuation_source': 'Funding round (Jan 2025)', 'region': 'US'},
+    {'name': 'TSMC', 'ticker': 'TSM', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': None, 'region': 'Taiwan'},
+    {'name': 'Arm', 'ticker': 'ARM', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'ARM-software', 'region': 'Europe'},
+    {'name': 'MongoDB', 'ticker': 'MDB', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'mongodb', 'region': 'US'},
     {'name': 'Stability AI', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'Stability-AI', 'last_valuation': 1000000000, 'valuation_source': 'Seed round (Oct 2022)', 'region': 'Europe'},
     # --- added global large-cap (2026-05-29) ---
     {'name': 'Alibaba', 'ticker': 'BABA', 'is_private': False, 'sector': 'Technology', 'is_ai_company': True, 'github_org': 'alibaba', 'region': 'China'},
@@ -39,16 +44,41 @@ TIER2_COMPANIES = [
     {'name': 'SK Hynix', 'ticker': '000660.KS', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': None, 'region': 'Korea'},
     {'name': 'SAP', 'ticker': 'SAP', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'SAP', 'region': 'Europe'},
     {'name': 'ASML', 'ticker': 'ASML', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': None, 'region': 'Europe'},
-    {'name': 'Broadcom', 'ticker': 'AVGO', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': True, 'github_org': 'Broadcom', 'region': 'US'},
     {'name': 'Qualcomm', 'ticker': 'QCOM', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'qualcomm', 'region': 'US'},
-    {'name': 'Adobe', 'ticker': 'ADBE', 'is_private': False, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'adobe', 'region': 'US'},
-    {'name': 'ServiceNow', 'ticker': 'NOW', 'is_private': False, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'ServiceNow', 'region': 'US'},
+    {'name': 'C3 AI', 'ticker': 'AI', 'is_private': False, 'sector': 'AI', 'is_ai_company': True, 'github_org': None, 'region': 'US'},
     {'name': 'Sony', 'ticker': 'SONY', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'sony', 'region': 'Japan'},
     {'name': 'SoftBank', 'ticker': 'SFTBY', 'is_private': False, 'sector': 'Technology', 'is_ai_company': True, 'github_org': None, 'region': 'Japan'},
     {'name': 'Infineon', 'ticker': 'IFNNY', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'Infineon', 'region': 'Europe'},
     {'name': 'STMicroelectronics', 'ticker': 'STM', 'is_private': False, 'sector': 'Semiconductors', 'is_ai_company': False, 'github_org': 'STMicroelectronics', 'region': 'Europe'},
     {'name': 'CrowdStrike', 'ticker': 'CRWD', 'is_private': False, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'CrowdStrike', 'region': 'US'},
     {'name': 'Palo Alto Networks', 'ticker': 'PANW', 'is_private': False, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'PaloAltoNetworks', 'region': 'US'}
+    ,
+    # --- major US software / tech public companies that should not be missing ---
+    {'name': 'Netflix', 'ticker': 'NFLX', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'netflix', 'region': 'US'},
+    {'name': 'Cisco', 'ticker': 'CSCO', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'cisco', 'region': 'US'},
+    {'name': 'Intuit', 'ticker': 'INTU', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'intuit', 'region': 'US'},
+    {'name': 'Workday', 'ticker': 'WDAY', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'workday', 'region': 'US'},
+    {'name': 'Datadog', 'ticker': 'DDOG', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'DataDog', 'region': 'US'},
+    {'name': 'Autodesk', 'ticker': 'ADSK', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'Autodesk', 'region': 'US'},
+    {'name': 'Zoom', 'ticker': 'ZM', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'zoom', 'region': 'US'},
+    {'name': 'Okta', 'ticker': 'OKTA', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'okta', 'region': 'US'},
+    {'name': 'Zscaler', 'ticker': 'ZS', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'zscaler', 'region': 'US'},
+    {'name': 'Uber', 'ticker': 'UBER', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'uber', 'region': 'US'},
+    {'name': 'Airbnb', 'ticker': 'ABNB', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'airbnb', 'region': 'US'},
+    {'name': 'DoorDash', 'ticker': 'DASH', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'doordash', 'region': 'US'},
+    {'name': 'Block', 'ticker': 'XYZ', 'is_private': False, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'block', 'region': 'US'},
+    {'name': 'PayPal', 'ticker': 'PYPL', 'is_private': False, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'paypal', 'region': 'US'},
+    {'name': 'GitLab', 'ticker': 'GTLB', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'gitlabhq', 'region': 'US'},
+    {'name': 'Twilio', 'ticker': 'TWLO', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'twilio', 'region': 'US'},
+    {'name': 'HubSpot', 'ticker': 'HUBS', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'hubspot', 'region': 'US'},
+    {'name': 'Confluent', 'ticker': 'CFLT', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'confluentinc', 'region': 'US'},
+    {'name': 'Elastic', 'ticker': 'ESTC', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'elastic', 'region': 'US'},
+    {'name': 'DocuSign', 'ticker': 'DOCU', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'docusign', 'region': 'US'},
+    {'name': 'Pure Storage', 'ticker': 'PSTG', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'purestorage', 'region': 'US'},
+    {'name': 'Smartsheet', 'ticker': 'SMAR', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'smartsheet', 'region': 'US'},
+    {'name': 'Fastly', 'ticker': 'FSLY', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'fastly', 'region': 'US'},
+    {'name': 'ZoomInfo', 'ticker': 'ZI', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'zoominfo', 'region': 'US'},
+    {'name': 'Asana', 'ticker': 'ASAN', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'asana', 'region': 'US'}
 ]
 
 TIER3_COMPANIES = [
@@ -56,7 +86,6 @@ TIER3_COMPANIES = [
     {'name': 'Oracle', 'ticker': 'ORCL', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'oracle', 'region': 'US'},
     {'name': 'IBM', 'ticker': 'IBM', 'is_private': False, 'sector': 'Technology', 'is_ai_company': False, 'github_org': 'IBM', 'region': 'US'},
     {'name': 'Shopify', 'ticker': 'SHOP', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'Shopify', 'region': 'Canada'},
-    {'name': 'Stripe', 'ticker': None, 'is_private': True, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'stripe', 'last_valuation': 91500000000, 'valuation_source': 'Tender offer (2025)', 'region': 'US'},
     {'name': 'Coinbase', 'ticker': 'COIN', 'is_private': False, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'coinbase', 'region': 'US'},
     {'name': 'Robinhood', 'ticker': 'HOOD', 'is_private': False, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'robinhood', 'region': 'US'},
     {'name': 'Unity', 'ticker': 'U', 'is_private': False, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'Unity-Technologies', 'region': 'US'},
@@ -138,39 +167,148 @@ TIER3_COMPANIES = [
     {'name': 'Sarvam AI', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'sarvamai', 'last_valuation': 1500000000, 'valuation_source': 'Round (2026, reported)', 'region': 'India'},
     {'name': 'Krutrim', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': None, 'last_valuation': 1500000000, 'valuation_source': 'Round (2025)', 'region': 'India'},
     {'name': 'Zoho', 'ticker': None, 'is_private': True, 'sector': 'Software', 'is_ai_company': True, 'github_org': 'zoho', 'last_valuation': None, 'valuation_source': 'Bootstrapped (private)', 'region': 'India'}
+    ,
+    # --- major US private software / AI / infra companies ---
+    {'name': 'Postman', 'ticker': None, 'is_private': True, 'sector': 'Developer Tools', 'is_ai_company': False, 'github_org': 'postmanlabs', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Glean', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'glean', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Airtable', 'ticker': None, 'is_private': True, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'airtable', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Rippling', 'ticker': None, 'is_private': True, 'sector': 'Software', 'is_ai_company': False, 'github_org': 'rippling', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Ramp', 'ticker': None, 'is_private': True, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'ramp', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Brex', 'ticker': None, 'is_private': True, 'sector': 'Fintech', 'is_ai_company': False, 'github_org': 'brex', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Writer', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'writer', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Character AI', 'ticker': None, 'is_private': True, 'sector': 'AI', 'is_ai_company': True, 'github_org': 'character-ai', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'},
+    {'name': 'Lambda', 'ticker': None, 'is_private': True, 'sector': 'AI Infrastructure', 'is_ai_company': True, 'github_org': 'lambda', 'last_valuation': None, 'valuation_source': 'Private', 'region': 'US'}
 ]
 
 ALL_COMPANIES = [c['name'] for c in TIER1_COMPANIES + TIER2_COMPANIES + TIER3_COMPANIES]
 
+TIER1_NAMES = {c['name'] for c in TIER1_COMPANIES}
+TIER2_NAMES = {c['name'] for c in TIER2_COMPANIES}
+TIER3_NAMES = {c['name'] for c in TIER3_COMPANIES}
+
+# Top-company official source registry. Feeds are the monitored sources; pages are
+# the public landing pages we want to keep in scope for autodiscovery / future
+# extraction. Keep this focused on the biggest companies and the most active
+# tier-2 names.
+OFFICIAL_COMPANY_SOURCE_REGISTRY = {
+    'NVIDIA': {
+        'feeds': ['https://blogs.nvidia.com/feed/'],
+        'pages': ['https://blogs.nvidia.com/'],
+    },
+    'Google': {
+        'feeds': ['https://blog.google/rss/'],
+        'pages': ['https://blog.google/'],
+    },
+    'Microsoft': {
+        'feeds': ['https://blogs.microsoft.com/feed/'],
+        'pages': ['https://blogs.microsoft.com/', 'https://news.microsoft.com/'],
+    },
+    'Apple': {
+        'feeds': ['https://www.apple.com/newsroom/rss-feed.rss'],
+        'pages': ['https://www.apple.com/newsroom/'],
+    },
+    'OpenAI': {
+        'feeds': ['https://openai.com/news/rss.xml'],
+        'pages': ['https://openai.com/news/'],
+    },
+    'Meta': {
+        'feeds': ['https://about.fb.com/news/feed/'],
+        'pages': ['https://about.fb.com/news/'],
+    },
+    'Amazon': {
+        'feeds': ['https://aws.amazon.com/blogs/machine-learning/feed/'],
+        'pages': ['https://aws.amazon.com/blogs/machine-learning/'],
+    },
+    'Tesla': {
+        'pages': ['https://www.tesla.com/blog'],
+    },
+    'Anthropic': {
+        'pages': ['https://www.anthropic.com/news'],
+    },
+    'Salesforce': {
+        'pages': ['https://www.salesforce.com/news/'],
+    },
+    'Adobe': {
+        'feeds': ['https://blog.adobe.com/en/rss.xml'],
+        'pages': ['https://blog.adobe.com/en/'],
+    },
+    'ServiceNow': {
+        'pages': ['https://www.servicenow.com/company/media/press-room.html'],
+    },
+    'Palantir': {
+        'pages': ['https://www.palantir.com/newsroom/'],
+    },
+    'Snowflake': {
+        'pages': ['https://www.snowflake.com/en/blog/'],
+    },
+    'Databricks': {
+        'feeds': ['https://www.databricks.com/blog/feed.xml'],
+        'pages': ['https://www.databricks.com/blog'],
+    },
+    'HuggingFace': {
+        'feeds': ['https://huggingface.co/blog/feed.xml'],
+        'pages': ['https://huggingface.co/blog'],
+    },
+    'Mistral': {
+        'pages': ['https://mistral.ai/news/'],
+    },
+    'Cloudflare': {
+        'feeds': ['https://blog.cloudflare.com/rss/'],
+        'pages': ['https://blog.cloudflare.com/'],
+    },
+    'Broadcom': {
+        'pages': ['https://www.broadcom.com/company/newsroom'],
+    },
+    'AMD': {
+        'pages': ['https://www.amd.com/en/newsroom'],
+    },
+    'Intel': {
+        'pages': ['https://www.intel.com/content/www/us/en/newsroom/home.html'],
+    },
+    'Stripe': {
+        'feeds': ['https://stripe.com/blog/feed.xml'],
+        'pages': ['https://stripe.com/blog'],
+    },
+    'CoreWeave': {
+        'pages': ['https://www.coreweave.com/blog'],
+    },
+}
+
+OFFICIAL_COMPANY_SOURCE_URLS = sorted({
+    url
+    for spec in OFFICIAL_COMPANY_SOURCE_REGISTRY.values()
+    for url in (*spec.get('feeds', []), *spec.get('pages', []))
+})
+
 YOUTUBE_CHANNELS = [
-    {'name': 'Fireship', 'channel_id': 'UCsBjURrPoezykLs9EqgamOA', 'category': 'dev', 'playlist_id': 'UUsBjURrPoezykLs9EqgamOA'},
+    {'name': 'Fireship', 'channel_id': 'UCsBjURrPoezykLs9EqgamOA', 'category': 'software', 'playlist_id': 'UUsBjURrPoezykLs9EqgamOA'},
     {'name': 'Two Minute Papers', 'channel_id': 'UCbfYPyITQ-7l4upoX8nvctg', 'category': 'ai_ml', 'playlist_id': 'UUbfYPyITQ-7l4upoX8nvctg'},
     {'name': 'Yannic Kilcher', 'channel_id': 'UCZHmQk67mSJgfCCTn7xBfew', 'category': 'ai_ml', 'playlist_id': 'UUZHmQk67mSJgfCCTn7xBfew'},
     {'name': 'AI Explained', 'channel_id': 'UCNJ1Ymd5yFuUPtn21xtRbbw', 'category': 'ai_ml', 'playlist_id': 'UUNJ1Ymd5yFuUPtn21xtRbbw'},
     {'name': 'Matt Wolfe', 'channel_id': 'UChpleBmo18P08aKCIgti38g', 'category': 'ai_ml', 'playlist_id': 'UUhpleBmo18P08aKCIgti38g'},
     {'name': 'World of AI', 'channel_id': 'UC2WmuBuFq6gL08QYG-JjXKw', 'category': 'ai_ml', 'playlist_id': 'UU2WmuBuFq6gL08QYG-JjXKw'},
-    {'name': 'MKBHD', 'channel_id': 'UCBJycsmduvYEL83R_U4JriQ', 'category': 'tech_general', 'playlist_id': 'UUBJycsmduvYEL83R_U4JriQ'},
-    {'name': 'Linus Tech Tips', 'channel_id': 'UCXuqSBlHAE6Xw-yeJA0Tunw', 'category': 'tech_general', 'playlist_id': 'UUXuqSBlHAE6Xw-yeJA0Tunw'},
-    {'name': 'Mrwhosetheboss', 'channel_id': 'UCMiJRAwDNSNzuYeN2uWa0pA', 'category': 'tech_general', 'playlist_id': 'UUMiJRAwDNSNzuYeN2uWa0pA'},
+    {'name': 'MKBHD', 'channel_id': 'UCBJycsmduvYEL83R_U4JriQ', 'category': 'software', 'playlist_id': 'UUBJycsmduvYEL83R_U4JriQ'},
+    {'name': 'Linus Tech Tips', 'channel_id': 'UCXuqSBlHAE6Xw-yeJA0Tunw', 'category': 'software', 'playlist_id': 'UUXuqSBlHAE6Xw-yeJA0Tunw'},
+    {'name': 'Mrwhosetheboss', 'channel_id': 'UCMiJRAwDNSNzuYeN2uWa0pA', 'category': 'software', 'playlist_id': 'UUMiJRAwDNSNzuYeN2uWa0pA'},
     {'name': 'Varun Mayya', 'channel_id': 'UCsQoiOrh7jzKmE8NBofhTnQ', 'category': 'startup', 'playlist_id': 'UUsQoiOrh7jzKmE8NBofhTnQ'},
     {'name': 'Y Combinator', 'channel_id': 'UCcefcZRL2oaA_uBNeo5UOWg', 'category': 'startup', 'playlist_id': 'UUcefcZRL2oaA_uBNeo5UOWg'},
     {'name': 'Garry Tan', 'channel_id': 'UCIBgYfDjtWlbJhg--Z4sOgQ', 'category': 'startup', 'playlist_id': 'UUIBgYfDjtWlbJhg--Z4sOgQ'},
     {'name': 'Meet Kevin', 'channel_id': 'UCUvvj5lwue7PspotMDjk5UA', 'category': 'finance', 'playlist_id': 'UUUvvj5lwue7PspotMDjk5UA'},
     {'name': 'The Plain Bagel', 'channel_id': 'UCFCEuCsyWP0YkP3CZ3Mr01Q', 'category': 'finance', 'playlist_id': 'UUFCEuCsyWP0YkP3CZ3Mr01Q'},
-    {'name': 'ThePrimeagen', 'channel_id': 'UCUyeluBRhGPCW4rPe_UvBZQ', 'category': 'dev', 'playlist_id': 'UUUyeluBRhGPCW4rPe_UvBZQ'},
-    {'name': 'NetworkChuck', 'channel_id': 'UC9x0AN7BWHpCDHSm9NiJFJQ', 'category': 'dev', 'playlist_id': 'UU9x0AN7BWHpCDHSm9NiJFJQ'},
+    {'name': 'ThePrimeagen', 'channel_id': 'UCUyeluBRhGPCW4rPe_UvBZQ', 'category': 'software', 'playlist_id': 'UUUyeluBRhGPCW4rPe_UvBZQ'},
+    {'name': 'NetworkChuck', 'channel_id': 'UC9x0AN7BWHpCDHSm9NiJFJQ', 'category': 'software', 'playlist_id': 'UU9x0AN7BWHpCDHSm9NiJFJQ'},
     {'name': 'Joseph Carlson', 'channel_id': 'UCfCT7SSFEWyG4th9ZmaGYqQ', 'category': 'finance', 'playlist_id': 'UUfCT7SSFEWyG4th9ZmaGYqQ'},
     {'name': 'BG2 Pod', 'channel_id': 'UC-yRDvpR99LUc5l7i7jLzew', 'category': 'finance', 'playlist_id': 'UU-yRDvpR99LUc5l7i7jLzew'},
     {'name': 'Ticker Symbol: YOU', 'channel_id': 'UC7kCeZ53sli_9XwuQeFxLqw', 'category': 'finance', 'playlist_id': 'UU7kCeZ53sli_9XwuQeFxLqw'},
-    {'name': 'Andrej Karpathy', 'channel_id': 'UCXUPKJO5MZQN11PqgIvyuvQ', 'category': 'dev', 'playlist_id': 'UUXUPKJO5MZQN11PqgIvyuvQ'},
-    {'name': 'ByteByteGo', 'channel_id': 'UCZgt6AzoyjslHTC9dz0UoTw', 'category': 'dev', 'playlist_id': 'UUZgt6AzoyjslHTC9dz0UoTw'},
-    {'name': 'Web Dev Simplified', 'channel_id': 'UCFbNIlppjAuEX4znoulh0Cw', 'category': 'dev', 'playlist_id': 'UUFbNIlppjAuEX4znoulh0Cw'},
-    {'name': 'Traversy Media', 'channel_id': 'UC29ju8bIPH5as8OGnQzwJyA', 'category': 'dev', 'playlist_id': 'UU29ju8bIPH5as8OGnQzwJyA'},
-    {'name': 'TechLead', 'channel_id': 'UC4xKdmAXFh4ACyhpiQ_3qBw', 'category': 'dev', 'playlist_id': 'UU4xKdmAXFh4ACyhpiQ_3qBw'},
+    {'name': 'Andrej Karpathy', 'channel_id': 'UCXUPKJO5MZQN11PqgIvyuvQ', 'category': 'ai_ml', 'playlist_id': 'UUXUPKJO5MZQN11PqgIvyuvQ'},
+    {'name': 'ByteByteGo', 'channel_id': 'UCZgt6AzoyjslHTC9dz0UoTw', 'category': 'software', 'playlist_id': 'UUZgt6AzoyjslHTC9dz0UoTw'},
+    {'name': 'Web Dev Simplified', 'channel_id': 'UCFbNIlppjAuEX4znoulh0Cw', 'category': 'software', 'playlist_id': 'UUFbNIlppjAuEX4znoulh0Cw'},
+    {'name': 'Traversy Media', 'channel_id': 'UC29ju8bIPH5as8OGnQzwJyA', 'category': 'software', 'playlist_id': 'UU29ju8bIPH5as8OGnQzwJyA'},
+    {'name': 'TechLead', 'channel_id': 'UC4xKdmAXFh4ACyhpiQ_3qBw', 'category': 'software', 'playlist_id': 'UU4xKdmAXFh4ACyhpiQ_3qBw'},
     {'name': 'All-In Podcast', 'channel_id': 'UCESLZhusAkFfsNsApnjF_Cg', 'category': 'finance', 'playlist_id': 'UUESLZhusAkFfsNsApnjF_Cg'},
     {'name': 'HyperChange', 'channel_id': 'UC1LAjODfg7dnSSrrPGGPPMw', 'category': 'finance', 'playlist_id': 'UU1LAjODfg7dnSSrrPGGPPMw'},
     {'name': 'ARK Invest', 'channel_id': 'UCK-zlnUfoDHzUwXcbddtnkg', 'category': 'finance', 'playlist_id': 'UUK-zlnUfoDHzUwXcbddtnkg'},
-    {'name': 'Modern Software Engineering', 'channel_id': 'UCCfqyGl3nq_V0bo64CjZh8g', 'category': 'dev', 'playlist_id': 'UUCfqyGl3nq_V0bo64CjZh8g'}
+    {'name': 'Modern Software Engineering', 'channel_id': 'UCCfqyGl3nq_V0bo64CjZh8g', 'category': 'software', 'playlist_id': 'UUCfqyGl3nq_V0bo64CjZh8g'}
 ]
 
 BLUESKY_ACCOUNTS = [
@@ -183,16 +321,32 @@ BLUESKY_ACCOUNTS = [
 ]
 
 RSS_FEEDS = [
-    'https://techcrunch.com/feed/',
-    'https://www.theverge.com/rss/index.xml',
-    'https://arstechnica.com/feed/',
-    'https://venturebeat.com/feed/',
-    'https://www.technologyreview.com/feed/',
-    'https://www.wired.com/feed/rss',
-    'https://news.ycombinator.com/rss',
-    'https://www.techmeme.com/feed.xml',
-    'https://www.infoq.com/feed/',
-    'https://dev.to/feed'
+    # Official product / engineering / release feeds only. These are narrower
+    # than the general news feeds and are intended to strengthen releases,
+    # conferences, research, and launch coverage without adding noisy sources.
+    'https://github.blog/feed/',
+    'https://blog.google/rss/',
+    'https://blog.cloudflare.com/rss/',
+    'https://huggingface.co/blog/feed.xml',
+    'https://openai.com/news/rss.xml',
+    'https://vercel.com/blog/rss.xml',
+    'https://supabase.com/blog/rss.xml',
+    'https://aws.amazon.com/blogs/machine-learning/feed/',
+    'https://stripe.com/blog/feed.xml',
+    'https://www.mongodb.com/blog/rss.xml'
+]
+
+# GitHub release feeds for both companies and major open-source projects.
+OFFICIAL_COMPANY_RELEASE_FEEDS = [
+    'https://github.com/vercel/next.js/releases.atom',
+    'https://github.com/supabase/supabase/releases.atom',
+    'https://github.com/openai/openai-python/releases.atom',
+    'https://github.com/anthropics/anthropic-sdk-python/releases.atom',
+    'https://github.com/huggingface/transformers/releases.atom',
+    'https://github.com/langchain-ai/langchain/releases.atom',
+    'https://github.com/microsoft/vscode/releases.atom',
+    'https://github.com/facebook/react/releases.atom',
+    'https://github.com/tailwindlabs/tailwindcss/releases.atom'
 ]
 
 REDDIT_SUBREDDITS = [
@@ -200,9 +354,22 @@ REDDIT_SUBREDDITS = [
     'singularity',
     'LocalLLaMA',
     'OpenAI',
+    'ChatGPT',
     'SaaS',
+    'technology',
+    'technews',
+    'programming',
+    'apple',
+    'google',
+    'microsoft',
+    'ArtificialIntelligence',
     'devops',
     'softwaredevelopment',
     'ClaudeAI',
-    'Anthropic'
+    'Anthropic',
+    'webdev',
+    'sysadmin',
+    'selfhosted',
+    'opensource',
+    'startups'
 ]
