@@ -5,7 +5,7 @@ on:
 
 jobs:
   llm_batch:
-    name: Gemini Batch — Categorize, Disputes, Briefs
+    name: LLM Batch — Categorize, Disputes, Briefs
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:

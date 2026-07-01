@@ -175,7 +175,7 @@ def main():
                             llm_processed_flag = True
                             
                         except Exception as e:
-                            logger.error(f"Gemini parse error for video {video_id}: {e}")
+                            logger.error(f"LLM parse error for video {video_id}: {e}")
                             entities = extract_entities(f"{title}\n{transcript_text}", ALL_COMPANIES)
                             sentiment = TextBlob(sentiment_text(title, summary, transcript_text)).sentiment.polarity
                             detected_category = infer_youtube_category(category, title, transcript_text[:280])

@@ -65,12 +65,12 @@ This project tries to pull those streams together into one investor-facing view 
 
 Used selectively for classification, summarization, dispute handling, influencer validation, and digest generation.
 
-Current provider chain in code:
+Current default provider chain in code:
 
-- **Groq**
-- **Cerebras**
-- **OpenRouter**
-- **Gemini**
+- **Groq** as primary
+- **Gemini** as fallback
+
+Optional providers like **Cerebras** and **OpenRouter** are only used if you explicitly add them to `LLM_PROVIDER_CHAIN`.
 
 ## Data sources and APIs in use
 
@@ -127,9 +127,10 @@ These are the workflows currently wired in the repo.
 | `ingest_stocks.yml` | Tier 1 `*/15`, Tier 2 `*/30`, Tier 3 `0 */2 * * *` | Stock snapshots and company market data by priority tier |
 | `ingest_hackernews.yml` | `*/20 * * * *` | Hacker News polling |
 | `ingest_firehoses.yml` | `0 * * * *` | GDELT, SEC, arXiv, CourtListener-style firehose sources |
-| `ingest_and_process.yml` | `0 */6 * * *` | Reddit, YouTube, GitHub, Bluesky, Product Hunt, Hugging Face, plus processing steps |
+| `ingest_and_process.yml` | `5 */6 * * *` | Reddit, YouTube, GitHub, Bluesky, Product Hunt, Hugging Face ingestion |
+| `llm_followups.yml` | `30 */6 * * *` | LLM batch post-processing and influencer-trust validation after ingest has settled |
 | `ingest_finnhub_extras.yml` | `30 22 * * *` | Insider trades, earnings calendar, analyst recommendation data |
-| `daily_digest.yml` | `0 2 * * *` | Daily investor digest generation |
+| `daily_digest.yml` | `20 2 * * *` | Daily investor digest generation |
 | `supabase_keepalive.yml` | `0 */12 * * *` | Keepalive, cleanup, maintenance-style jobs |
 
 There are also manual-only workflows in the repo for targeted runs like `ingest_news.yml` and `run_llm_batch.yml`.

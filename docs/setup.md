@@ -117,6 +117,8 @@ Add these in GitHub repo settings if you want scheduled jobs to work:
 - `LLM_MODEL`
 - `GEMINI_MODEL`
 
+These env var names are case-sensitive. Use `LLM_PROVIDER`, not `LLM_provider`.
+
 Often also needed:
 
 - `CEREBRAS_API_KEY`
@@ -149,6 +151,7 @@ When ready:
 - `ingest_hackernews.yml`
 - `ingest_firehoses.yml`
 - `ingest_and_process.yml`
+- `llm_followups.yml`
 - `ingest_finnhub_extras.yml`
 - `daily_digest.yml`
 - `supabase_keepalive.yml`

@@ -417,7 +417,7 @@ export default function CompanyDashboard() {
 
   useEffect(() => {
     async function fetchCompanies() {
-      const cached = cache.get('companies-market-map-v3');
+      const cached = cache.get('companies-market-map-v4');
       if (cached) {
         setCompanies(cached);
         setLoading(false);
@@ -431,7 +431,7 @@ export default function CompanyDashboard() {
 
       if (!error && data) {
         setCompanies(data);
-        cache.set('companies-market-map-v3', data, 5);
+        cache.set('companies-market-map-v4', data, 5);
       }
       setLoading(false);
     }
