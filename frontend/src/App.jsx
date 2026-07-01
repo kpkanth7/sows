@@ -7,7 +7,6 @@ import CompanyDashboard from "./components/CompanyDashboard";
 import InvestorHub from "./components/InvestorHub";
 import ConferenceCalendar from "./components/ConferenceCalendar";
 import ComparisonWidget from "./components/ComparisonWidget";
-import StatusPanel from "./components/StatusPanel";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 const ROOT_TITLE = "Tech-Intel | Technology Company Intelligence";
@@ -25,10 +24,6 @@ const TOP_TAB_META = {
   investors: {
     label: "Investor Hub",
     description: "Review investor forecasts, catalysts, influencer track records, insider activity, and daily digest signals in one place.",
-  },
-  status: {
-    label: "Pipeline Status",
-    description: "Monitor ingestion and processing health across the Tech-Intel data pipeline.",
   },
 };
 
@@ -153,12 +148,6 @@ export default function App() {
                 </ErrorBoundary>
               </aside>
             </div>
-          )}
-
-          {activeTab === 'status' && (
-            <ErrorBoundary label="Pipeline Status failed to load.">
-              <StatusPanel />
-            </ErrorBoundary>
           )}
         </div>
       </main>

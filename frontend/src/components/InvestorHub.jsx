@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Target, Users, TrendingUp, DollarSign, Rocket, FileText, Newspaper } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { cache } from '../services/cache';
+import { buildEventMap, getUpcomingCatalyst } from '../lib/catalysts';
 import InsiderTradesPanel from './InsiderTradesPanel';
 import DarkHorsePanel from './DarkHorsePanel';
 import MaterialEventsPanel from './MaterialEventsPanel';
@@ -24,13 +25,6 @@ const FORECAST_WEIGHT = {
   bearish: -0.7,
   high_risk: -1.0,
 };
-
-function daysFromToday(dateString) {
-  if (!dateString) return null;
-  const today = new Date(new Date().toISOString().slice(0, 10));
-  const target = new Date(dateString);
-  return Math.round((target - today) / 86400000);
-}
 
 function average(values) {
   if (!values.length) return 0;
@@ -130,7 +124,7 @@ function buildInsiderMap(rows) {
   return map;
 }
 
-function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgradeMap, insiderMap) {
+function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgradeMap, insiderMap, eventMap) {
   const summaries = companies.map((company) => {
     const news = newsMap.get(company.name) || {
       count: 0,
@@ -142,10 +136,13 @@ function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgrad
     };
     const darkHorse = darkHorseMap.get(company.id);
     const earnings = earningsMap.get(company.id) || [];
-    const nextEarnings = earnings.find((row) => daysFromToday(row.earnings_date) >= 0) || null;
+    const catalyst = getUpcomingCatalyst({ company, eventMap, earnings });
+    const nextEarnings = catalyst?.kind === 'earnings'
+      ? earnings.find((row) => row.earnings_date === catalyst.date) || null
+      : (earnings.find((row) => row.earnings_date === catalyst?.date) || null);
     const upgrades = upgradeMap.get(company.id) || { up: 0, down: 0 };
     const insider = insiderMap.get(company.id) || { buys: 0, sells: 0 };
-    const daysToEarnings = nextEarnings ? daysFromToday(nextEarnings.earnings_date) : null;
+    const daysToCatalyst = catalyst ? Math.round((new Date(catalyst.date) - new Date(new Date().toISOString().slice(0, 10))) / 86400000) : null;
     const forecastConfidence = Number(company.forecast_confidence || 0);
     const forecastTilt = FORECAST_WEIGHT[company.forecast_direction] || 0;
     const sentimentAvg = Number(news.sentimentAvg || 0);
@@ -154,8 +151,7 @@ function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgrad
     const darkHorseScore = Number(darkHorse?.score || 0);
     const upgradeDelta = upgrades.up - upgrades.down;
     const insiderBias = insider.buys - insider.sells;
-    const upcomingCatalyst = daysToEarnings != null && daysToEarnings >= 0 && daysToEarnings <= 21;
-    const recentEventCatalyst = company.recent_event && company.recent_event_date && daysFromToday(company.recent_event_date) != null && daysFromToday(company.recent_event_date) >= 0;
+    const upcomingCatalyst = daysToCatalyst != null && daysToCatalyst >= 0 && daysToCatalyst <= 45;
 
     const reasons = [];
     if (articleCount >= 4) reasons.push(`${articleCount} news items / 7d`);
@@ -167,22 +163,23 @@ function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgrad
     if (upgradeDelta < 0) reasons.push(`${upgrades.down} analyst downgrades`);
     if (insiderBias > 0) reasons.push('net insider buying');
     if (insiderBias < 0) reasons.push('net insider selling');
-    if (upcomingCatalyst) reasons.push(`earnings in ${daysToEarnings === 0 ? 'today' : `${daysToEarnings}d`}`);
-    if (recentEventCatalyst) reasons.push(`${company.recent_event.replace('_', ' ')} ahead`);
+    if (upcomingCatalyst && catalyst) {
+      reasons.push(`${catalyst.type.replace('_', ' ')} in ${daysToCatalyst === 0 ? 'today' : `${daysToCatalyst}d`}`);
+    }
 
-    const momentumScore = clamp(
+    const derivedMomentumScore = clamp(
       forecastConfidence * Math.max(forecastTilt, 0) * 0.5 +
       articleCount * 7 +
       Math.max(sentimentAvg, 0) * 30 +
       buzzAvg * 0.45 +
       darkHorseScore * 0.35 +
       Math.max(upgradeDelta, 0) * 9 +
-      (upcomingCatalyst ? 14 - Math.min(daysToEarnings, 14) : 0),
+      (upcomingCatalyst ? 14 - Math.min(daysToCatalyst, 14) : 0),
       0,
       100,
     );
 
-    const riskScore = clamp(
+    const derivedRiskScore = clamp(
       (company.forecast_direction === 'bearish' ? 24 : 0) +
       (company.forecast_direction === 'high_risk' ? 38 : 0) +
       Math.max(-sentimentAvg, 0) * 34 +
@@ -193,14 +190,18 @@ function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgrad
       100,
     );
 
-    const catalystScore = clamp(
-      (upcomingCatalyst ? 60 - Math.min(daysToEarnings * 2, 40) : 0) +
-      (recentEventCatalyst ? 22 : 0) +
+    const derivedCatalystScore = clamp(
+      (upcomingCatalyst ? 60 - Math.min(daysToCatalyst * 2, 40) : 0) +
+      (catalyst?.scoreBoost || 0) +
       articleCount * 3 +
       Math.max(buzzAvg - 20, 0) * 0.25,
       0,
       100,
     );
+
+    const momentumScore = Number(company.momentum_score ?? derivedMomentumScore);
+    const riskScore = Number(company.risk_score ?? derivedRiskScore);
+    const catalystScore = Number(company.catalyst_score ?? derivedCatalystScore);
 
     const privateScore = clamp(
       company.is_private
@@ -229,7 +230,7 @@ function buildForecastRows(companies, newsMap, darkHorseMap, earningsMap, upgrad
       reasons: reasons.slice(0, 4),
       latestHeadline: formatHeadline(news),
       summary: company.investor_brief || formatHeadline(news) || null,
-      nextEventLabel: nextEarnings ? `Earnings · ${nextEarnings.earnings_date}` : (company.recent_event ? `${company.recent_event.replace('_', ' ')} · ${company.recent_event_date || 'pending'}` : null),
+      nextEventLabel: catalyst?.label || null,
       latestValuation: company.last_valuation,
       marketCap: company.market_cap,
       momentumScore,
@@ -343,6 +344,7 @@ export default function InvestorHub() {
         newsRes,
         darkHorseRes,
         earningsRes,
+        eventsRes,
         upgradeRes,
         insiderRes,
         influencersRes,
@@ -350,7 +352,7 @@ export default function InvestorHub() {
       ] = await Promise.all([
         supabase
           .from('companies')
-          .select('id, name, ticker, is_private, sector, region, market_cap, last_valuation, valuation_source, controversy_score, forecast_direction, forecast_confidence, investor_brief, recent_event, recent_event_date')
+          .select('id, name, ticker, is_private, sector, region, market_cap, last_valuation, valuation_source, sentiment_score, buzz_score, controversy_score, momentum_score, risk_score, catalyst_score, forecast_direction, forecast_confidence, investor_brief, recent_event, recent_event_date')
           .order('name'),
         supabase
           .from('news_items')
@@ -367,6 +369,12 @@ export default function InvestorHub() {
           .select('company_id, earnings_date, sentiment_delta, eps_estimate, eps_actual, revenue_estimate, revenue_actual')
           .gte('earnings_date', today)
           .order('earnings_date', { ascending: true })
+          .limit(200),
+        supabase
+          .from('events_calendar')
+          .select('event_name, event_date, event_type, company_ids, company_names')
+          .gte('event_date', today)
+          .order('event_date', { ascending: true })
           .limit(200),
         supabase
           .from('upgrade_downgrade')
@@ -391,6 +399,7 @@ export default function InvestorHub() {
       ]);
 
       const companies = companiesRes.data || [];
+      const eventMap = buildEventMap(eventsRes.data || [], companies);
       const forecastRows = buildForecastRows(
         companies,
         buildNewsMap(newsRes.data || []),
@@ -398,6 +407,7 @@ export default function InvestorHub() {
         buildEarningsMap(earningsRes.data || []),
         buildUpgradeMap(upgradeRes.data || []),
         buildInsiderMap(insiderRes.data || []),
+        eventMap,
       );
 
       const result = {

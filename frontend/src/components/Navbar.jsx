@@ -45,14 +45,6 @@ export default function Navbar({ theme, toggleTheme, activeTab, setActiveTab }) 
         >
           Investor Hub
         </button>
-        <button
-          className={`nav-link tab-button ${activeTab === 'status' ? 'active' : ''}`}
-          onClick={() => setActiveTab('status')}
-          role="tab"
-          aria-selected={activeTab === 'status'}
-        >
-          Status
-        </button>
       </div>
 
       <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">

@@ -5,8 +5,8 @@ import ProgressBar from './ProgressBar';
 
 // Phase 3.12: Dark-Horse Movers panel. Reads from `dark_horse_movers` (top 20)
 // written daily by scripts/compute_dark_horses.py (Phase 3.11). Equal-weight
-// composite of 4 signals: GH stars z-score, news volume z-score, analyst
-// upgrade momentum, insider+market combined. Reasons array surfaces the
+// composite of 5 signals: GH stars z-score, news volume z-score, analyst
+// upgrade momentum, insider+market combined, and catalyst/release heat. Reasons array surfaces the
 // drivers (e.g. "GitHub stars surging").
 
 function ComponentBar({ label, value }) {
@@ -49,9 +49,9 @@ export default function DarkHorsePanel() {
 
   return (
     <div>
-      <p className="text-muted text-sm mb-6">
+        <p className="text-muted text-sm mb-6">
         Tracked companies punching above their weight. Equal-weight composite of GitHub stars z-score,
-        news volume z-score, analyst upgrade momentum, and combined insider + 7d stock momentum —
+        news volume z-score, analyst upgrade momentum, combined insider + 7d stock momentum, and catalyst/release heat —
         chosen to dilute single-source bias. This is a sample of the tracked universe, not the full market.
       </p>
       <div className="flex-col gap-3">
@@ -84,6 +84,7 @@ export default function DarkHorsePanel() {
                 <ComponentBar label="NEWS" value={c.news ?? 50} />
                 <ComponentBar label="ANALYST" value={c.analyst ?? 50} />
                 <ComponentBar label="INSIDER+MKT" value={c.market ?? 50} />
+                <ComponentBar label="CATALYST" value={c.catalyst ?? 50} />
               </div>
               {(r.reasons || []).length > 0 && (
                 <div className="flex gap-1 flex-wrap mt-1">

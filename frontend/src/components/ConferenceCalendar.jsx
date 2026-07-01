@@ -33,6 +33,7 @@ function eventTypeTone(type) {
 }
 
 function normalizeEventRow(row) {
+  const official = row.is_official ? 'Official event page' : 'Tracked event';
   return {
     id: `event-${row.id}`,
     date: row.event_date,
@@ -41,7 +42,8 @@ function normalizeEventRow(row) {
     type: row.event_type,
     companyNames: Array.isArray(row.company_names) ? row.company_names : [],
     url: row.url,
-    sourceLabel: 'Tracked event',
+    sourceLabel: row.source ? `${official} · ${row.source}` : official,
+    confidence: row.confidence,
   };
 }
 
@@ -115,6 +117,7 @@ export default function ConferenceCalendar() {
 
                 <div className="conference-event-meta">
                   <span className="badge badge-gray">{event.sourceLabel}</span>
+                  {event.confidence != null && <span className="badge badge-blue">{Math.round(event.confidence)}% conf</span>}
                   <span className="conference-event-meta-inline">
                     <Clock3 size={12} />
                     {event.type.replace('_', ' ')}
