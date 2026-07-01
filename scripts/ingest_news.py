@@ -3,6 +3,7 @@ import hashlib
 import time
 import httpx
 import feedparser
+from html.parser import HTMLParser
 from textblob import TextBlob
 from datetime import datetime, timedelta, timezone
 from db import get_client, check_quota, log_api_call, extract_entities
@@ -11,13 +12,50 @@ from companies_config import (
     RSS_FEEDS,
     OFFICIAL_COMPANY_RELEASE_FEEDS,
     OFFICIAL_COMPANY_SOURCE_REGISTRY,
+    SOURCE_REGION_BY_DOMAIN,
+    TIER1_NAMES,
+    TIER2_NAMES,
+    TIER3_NAMES,
 )
 import logging
+from urllib.parse import urljoin, urlparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 import re
+
+GENERIC_LINK_TEXT = {
+    'news', 'read more', 'read story', 'read announcement', 'learn more',
+    'about', 'support', 'contact', 'careers', 'events', 'pricing',
+}
+
+
+class _AnchorExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+        self._href = None
+        self._parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag != 'a':
+            return
+        attrs_dict = dict(attrs)
+        self._href = attrs_dict.get('href')
+        self._parts = []
+
+    def handle_data(self, data):
+        if self._href is not None:
+            self._parts.append(data)
+
+    def handle_endtag(self, tag):
+        if tag != 'a' or self._href is None:
+            return
+        text = re.sub(r'\s+', ' ', ''.join(self._parts)).strip()
+        self.links.append((self._href, text))
+        self._href = None
+        self._parts = []
 
 def compute_hash(url: str) -> str:
     return hashlib.md5(url.encode('utf-8')).hexdigest()
@@ -106,6 +144,134 @@ def infer_rss_category(title: str, feed_url: str = "") -> str:
         return 'ai'
     return 'other'
 
+
+def extract_official_page_entries(html: str, page_url: str, official_company: str):
+    parser = _AnchorExtractor()
+    parser.feed(html or "")
+    base_domain = urlparse(page_url).netloc
+    seen = set()
+    entries = []
+
+    for href, text in parser.links:
+        normalized_text = re.sub(r'\s+', ' ', text).strip()
+        if not normalized_text:
+            continue
+        if normalized_text.lower() in GENERIC_LINK_TEXT:
+            continue
+        if len(normalized_text) < 18 or len(normalized_text) > 180:
+            continue
+
+        absolute_url = urljoin(page_url, href)
+        parsed = urlparse(absolute_url)
+        if parsed.netloc and parsed.netloc != base_domain:
+            continue
+        path = parsed.path.lower()
+        looks_like_story = any(part in path for part in ['/news/', '/blog/', '/press/', '/announcements/', '/research/'])
+        title_signals = infer_rss_category(normalized_text, page_url)
+        if not looks_like_story and title_signals not in {'release', 'conference', 'research', 'ai'}:
+            continue
+        if absolute_url in seen:
+            continue
+        seen.add(absolute_url)
+        entries.append({
+            'title': normalized_text,
+            'url': absolute_url,
+            'source': official_company,
+            'source_type': 'official_company',
+            'source_credibility_tier': 1,
+            'entity_names': [official_company],
+            'sentiment': TextBlob(sentiment_text(normalized_text)).sentiment.polarity,
+            'buzz_score': calc_buzz(0.25, [official_company]),
+            'category': infer_rss_category(normalized_text, page_url),
+            'published_at': datetime.now(timezone.utc).isoformat(),
+        })
+    return entries[:20]
+
+
+def source_domain(url: str) -> str | None:
+    try:
+        netloc = urlparse(url or "").netloc.lower()
+        return netloc[4:] if netloc.startswith('www.') else netloc
+    except Exception:
+        return None
+
+
+def infer_source_region(url: str) -> str | None:
+    domain = source_domain(url)
+    if not domain:
+        return None
+    for known, region in SOURCE_REGION_BY_DOMAIN.items():
+        if domain == known or domain.endswith(f'.{known}'):
+            return region
+    return None
+
+
+def infer_source_kind(url: str, source_type: str, official_company: str | None = None) -> str:
+    domain = source_domain(url) or ""
+    if official_company:
+        if "github.com" in domain:
+            return "official_release_feed"
+        return "official_company_page"
+    if "github.com" in domain:
+        return "code_host"
+    if source_type == "research":
+        return "research_feed"
+    if source_type == "community":
+        return "community_feed"
+    return "tech_media"
+
+
+def entity_tier_max(entities: list[str]) -> int | None:
+    tiers = []
+    for entity in entities or []:
+        if entity in TIER1_NAMES:
+            tiers.append(1)
+        elif entity in TIER2_NAMES:
+            tiers.append(2)
+        elif entity in TIER3_NAMES:
+            tiers.append(3)
+    return min(tiers) if tiers else None
+
+
+def is_major_release(title: str, entities: list[str], category: str, source_credibility_tier: int, official_company: str | None = None) -> bool:
+    text = (title or "").lower()
+    strong_terms = [
+        "introducing", "introduce", "launch", "launched", "released", "release",
+        "sonnet", "gpt", "gemini", "claude", "llama", "model", "api",
+        "general availability", "available now", "debut", "unveil", "preview",
+        "rollout", "flagship",
+    ]
+    tracked_tier = entity_tier_max(entities)
+    return (
+        category == "release"
+        and source_credibility_tier <= 2
+        and any(term in text for term in strong_terms)
+        and (official_company is not None or tracked_tier in {1, 2})
+    )
+
+
+def enrich_item_metadata(item: dict, official_company: str | None = None) -> dict:
+    enriched = dict(item)
+    entities = list(enriched.get('entity_names') or [])
+    category = enriched.get('category') or infer_rss_category(enriched.get('title', ''), enriched.get('url', ''))
+    enriched['category'] = category
+    enriched['source_domain'] = source_domain(enriched.get('url'))
+    enriched['source_region'] = infer_source_region(enriched.get('url'))
+    enriched['source_kind'] = infer_source_kind(enriched.get('url'), enriched.get('source_type', 'news'), official_company)
+    enriched['source_priority'] = (
+        1 if official_company else
+        min(5, max(1, int((enriched.get('source_credibility_tier') or 3) + (0 if category in {'release', 'conference', 'controversy'} else 1))))
+    )
+    enriched['entity_tier_max'] = entity_tier_max(entities)
+    enriched['is_major_release'] = is_major_release(
+        enriched.get('title', ''),
+        entities,
+        category,
+        int(enriched.get('source_credibility_tier') or 3),
+        official_company,
+    )
+    return enriched
+
 def save_news(sb, item):
     try:
         url_hash = compute_hash(item['url'])
@@ -140,7 +306,13 @@ def save_news(sb, item):
                     'source_credibility_tier': item_tier,
                     'hn_score': item_hn_score,
                     'hn_comments': item_hn_comments,
-                    'published_at': item.get('published_at', datetime.now(timezone.utc).isoformat())
+                    'published_at': item.get('published_at', datetime.now(timezone.utc).isoformat()),
+                    'source_domain': item.get('source_domain'),
+                    'source_region': item.get('source_region'),
+                    'source_kind': item.get('source_kind'),
+                    'source_priority': item.get('source_priority'),
+                    'entity_tier_max': item.get('entity_tier_max'),
+                    'is_major_release': item.get('is_major_release', False),
                 }).eq('id', existing['id']).execute()
             return
             
@@ -199,7 +371,13 @@ def save_news(sb, item):
                             'source_credibility_tier': item_tier,
                             'hn_score': item_hn_score,
                             'hn_comments': item_hn_comments,
-                            'published_at': item.get('published_at', datetime.now(timezone.utc).isoformat())
+                            'published_at': item.get('published_at', datetime.now(timezone.utc).isoformat()),
+                            'source_domain': item.get('source_domain'),
+                            'source_region': item.get('source_region'),
+                            'source_kind': item.get('source_kind'),
+                            'source_priority': item.get('source_priority'),
+                            'entity_tier_max': item.get('entity_tier_max'),
+                            'is_major_release': item.get('is_major_release', False),
                         }).eq('id', recent['id']).execute()
                     return
 
@@ -247,25 +425,30 @@ def fetch_hn(sb):
                 'hn_comments': hit.get('num_comments', 0),
                 'published_at': hit.get('created_at')
             }
-            save_news(sb, item)
+            save_news(sb, enrich_item_metadata(item))
     except Exception as e:
         logger.error(f"HN error: {e}")
 
 def fetch_rss(sb):
     logger.info("Fetching RSS")
-    company_source_lookup = {
+    feed_source_lookup = {
         url: company
         for company, spec in OFFICIAL_COMPANY_SOURCE_REGISTRY.items()
-        for url in (*spec.get('feeds', []), *spec.get('pages', []))
+        for url in spec.get('feeds', [])
+    }
+    page_source_lookup = {
+        url: company
+        for company, spec in OFFICIAL_COMPANY_SOURCE_REGISTRY.items()
+        for url in spec.get('pages', [])
     }
     seen = set()
-    for feed_url in RSS_FEEDS + OFFICIAL_COMPANY_RELEASE_FEEDS + list(company_source_lookup.keys()):
+    for feed_url in RSS_FEEDS + OFFICIAL_COMPANY_RELEASE_FEEDS + list(feed_source_lookup.keys()):
         if feed_url in seen:
             continue
         seen.add(feed_url)
         try:
             feed = feedparser.parse(feed_url)
-            official_company = company_source_lookup.get(feed_url)
+            official_company = feed_source_lookup.get(feed_url)
             for entry in feed.entries[:30]:
                 title = entry.title
                 link = entry.link
@@ -287,10 +470,20 @@ def fetch_rss(sb):
                     'sentiment': sentiment,
                     'buzz_score': calc_buzz(sentiment, entities),
                     'category': 'release' if official_company else infer_rss_category(title, feed_url),
+                    'published_at': entry.get('published') or entry.get('updated') or datetime.now(timezone.utc).isoformat(),
                 }
-                save_news(sb, item)
+                save_news(sb, enrich_item_metadata(item, official_company=official_company))
         except Exception as e:
             logger.error(f"RSS error for {feed_url}: {e}")
+
+    for page_url, official_company in page_source_lookup.items():
+        try:
+            resp = httpx.get(page_url, timeout=12, headers={"User-Agent": "TechIntelBot/1.0"})
+            resp.raise_for_status()
+            for item in extract_official_page_entries(resp.text, page_url, official_company):
+                save_news(sb, enrich_item_metadata(item, official_company=official_company))
+        except Exception as e:
+            logger.error(f"Official page parse error for {page_url}: {e}")
 
 def fetch_thenewsapi(sb):
     logger.info("Fetching TheNewsAPI")
@@ -352,7 +545,7 @@ def fetch_thenewsapi(sb):
                     'buzz_score': calc_buzz(sentiment, entities),
                     'published_at': article.get('published_at') or datetime.now(timezone.utc).isoformat()
                 }
-                save_news(sb, item)
+                save_news(sb, enrich_item_metadata(item))
                 
             logger.info(f"TheNewsAPI page {page} processed. Total: {len(articles)}, Matched: {matched_count}")
             
@@ -397,7 +590,7 @@ def fetch_devto(sb):
                 'author': article.get('user', {}).get('username'),
                 'published_at': article.get('published_at')
             }
-            save_news(sb, item)
+            save_news(sb, enrich_item_metadata(item))
     except Exception as e:
         logger.error(f"devto error: {e}")
 

@@ -43,6 +43,26 @@ OPENAI_COMPATIBLE = {
 # Default rotation order. Keep the chain short unless you explicitly opt in to
 # more providers via LLM_PROVIDER_CHAIN.
 DEFAULT_CHAIN = ["groq", "gemini"]
+PROVIDER_RETRY_LIMITS = {
+    "groq": 3,
+    "gemini": 5,
+    "cerebras": 3,
+    "openrouter": 3,
+}
+PROVIDER_RETRY_BACKOFFS = {
+    "groq": 5,
+    "gemini": 10,
+    "cerebras": 5,
+    "openrouter": 5,
+}
+
+
+class ProviderError(RuntimeError):
+    def __init__(self, message: str, provider: str, retryable: bool = False, fallback_allowed: bool = True):
+        super().__init__(message)
+        self.provider = provider
+        self.retryable = retryable
+        self.fallback_allowed = fallback_allowed
 
 
 def strip_json_fence(text: str) -> str:
@@ -79,6 +99,13 @@ def _resolve_chain():
     return chain
 
 
+def _provider_has_key(provider: str) -> bool:
+    if provider == "gemini":
+        return bool(os.environ.get("GEMINI_API_KEY"))
+    cfg = OPENAI_COMPATIBLE.get(provider)
+    return bool(cfg and os.environ.get(cfg["env"]))
+
+
 def get_primary_provider() -> str:
     """Return the first provider in the resolved chain."""
     chain = _resolve_chain()
@@ -88,12 +115,7 @@ def get_primary_provider() -> str:
 def has_llm_capacity(sb, cost: int = 1) -> bool:
     """True when at least one configured provider is still under quota."""
     for provider in _resolve_chain():
-        key = None
-        if provider == "gemini":
-            key = os.environ.get("GEMINI_API_KEY")
-        elif provider in OPENAI_COMPATIBLE:
-            key = os.environ.get(OPENAI_COMPATIBLE[provider]["env"])
-        if not key:
+        if not _provider_has_key(provider):
             continue
         if check_quota(sb, provider, cost):
             return True
@@ -125,7 +147,7 @@ def _call_openai_compatible(provider: str, prompt: str, sb, max_tokens: int = No
     cfg = OPENAI_COMPATIBLE[provider]
     api_key = os.environ.get(cfg["env"])
     if not api_key:
-        raise RuntimeError(f"{cfg['env']} not set")
+        raise ProviderError(f"{cfg['env']} not set", provider=provider)
     model = _resolve_openai_model(provider, cfg)
     payload = {
         "model": model,
@@ -134,21 +156,43 @@ def _call_openai_compatible(provider: str, prompt: str, sb, max_tokens: int = No
     }
     if max_tokens:
         payload["max_tokens"] = max_tokens
-    resp = httpx.post(
-        cfg["url"],
-        json=payload,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        timeout=60,
-    )
-    resp.raise_for_status()
-    log_api_call(sb, provider, 1)
-    return resp.json()["choices"][0]["message"]["content"]
+    try:
+        resp = httpx.post(
+            cfg["url"],
+            json=payload,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        log_api_call(sb, provider, 1)
+        return resp.json()["choices"][0]["message"]["content"]
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code if e.response else None
+        body = ""
+        try:
+            body = (e.response.text or "")[:240]
+        except Exception:
+            body = str(e)
+        retryable = status in {408, 409, 425, 429, 500, 502, 503, 504}
+        raise ProviderError(
+            f"HTTP {status} from {provider} model {model}; prompt_chars={len(prompt)}; body={body}",
+            provider=provider,
+            retryable=retryable,
+            fallback_allowed=True,
+        ) from e
+    except httpx.RequestError as e:
+        raise ProviderError(
+            f"Network error from {provider} model {model}; prompt_chars={len(prompt)}; error={e}",
+            provider=provider,
+            retryable=True,
+            fallback_allowed=True,
+        ) from e
 
 
 def _call_gemini(prompt: str, sb, max_tokens: int = None) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY not set")
+        raise ProviderError("GEMINI_API_KEY not set", provider="gemini")
     from google import genai
 
     client = genai.Client(api_key=api_key)
@@ -156,24 +200,28 @@ def _call_gemini(prompt: str, sb, max_tokens: int = None) -> str:
     model = os.environ.get("GEMINI_MODEL") or (
         llm_model if llm_model.startswith("gemini") else "gemini-2.0-flash"
     )
-    max_retries = 5
-    backoff = 10
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-            )
-            log_api_call(sb, "gemini", 1)
-            return response.text
-        except Exception as e:
-            msg = str(e)
-            if ("429" in msg or "ResourceExhausted" in msg or "Quota exceeded" in msg) and attempt < max_retries - 1:
-                logger.warning(f"Gemini rate-limited; sleep {backoff}s ({attempt + 1}/{max_retries})")
-                time.sleep(backoff)
-                backoff *= 2
-            else:
-                raise
+    try:
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+        )
+        log_api_call(sb, "gemini", 1)
+        return response.text
+    except Exception as e:
+        msg = str(e)
+        retryable = (
+            "429" in msg
+            or "ResourceExhausted" in msg
+            or "Quota exceeded" in msg
+            or "503" in msg
+            or "500" in msg
+        )
+        raise ProviderError(
+            f"Gemini error for model {model}; prompt_chars={len(prompt)}; error={msg}",
+            provider="gemini",
+            retryable=retryable,
+            fallback_allowed=True,
+        ) from e
 
 
 def _call_provider(provider: str, prompt: str, sb, max_tokens: int = None) -> str:
@@ -192,10 +240,38 @@ def generate_llm_content(prompt: str, sb, max_tokens: int = None) -> str:
     """
     last_err = None
     for provider in _resolve_chain():
-        try:
-            return _call_provider(provider, prompt, sb, max_tokens)
-        except Exception as e:
-            logger.warning(f"LLM provider '{provider}' failed: {e} — trying next")
-            last_err = e
+        if not _provider_has_key(provider):
+            logger.info(f"LLM provider '{provider}' skipped: API key missing")
             continue
+        if not check_quota(sb, provider, 1):
+            logger.warning(f"LLM provider '{provider}' skipped: tracked quota says no capacity")
+            continue
+
+        max_retries = PROVIDER_RETRY_LIMITS.get(provider, 1)
+        backoff = PROVIDER_RETRY_BACKOFFS.get(provider, 5)
+        for attempt in range(max_retries):
+            try:
+                return _call_provider(provider, prompt, sb, max_tokens)
+            except ProviderError as e:
+                last_err = e
+                if e.retryable and attempt < max_retries - 1:
+                    logger.warning(
+                        "LLM provider '%s' retryable failure: %s — sleeping %ss (%s/%s)",
+                        provider,
+                        e,
+                        backoff,
+                        attempt + 1,
+                        max_retries,
+                    )
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                if e.fallback_allowed:
+                    logger.warning(f"LLM provider '{provider}' failed: {e} — trying next")
+                    break
+                raise
+            except Exception as e:
+                logger.warning(f"LLM provider '{provider}' failed: {e} — trying next")
+                last_err = e
+                break
     raise RuntimeError(f"All LLM providers failed. Last error: {last_err}")

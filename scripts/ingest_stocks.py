@@ -3,6 +3,7 @@ import time
 import argparse
 import logging
 from datetime import datetime, date, timedelta, timezone
+from functools import lru_cache
 import httpx
 import finnhub
 import yfinance as yf
@@ -54,6 +55,23 @@ CURRENCY_TO_USD = {
     'KRW': 0.00073,
 }
 
+def _normalize_change_pct(value):
+    """Normalize 24h change to a percent value.
+
+    Some providers return decimal fractions (0.0105), while others already
+    return percentage points (1.05). Preserve the latter and scale only the
+    former.
+    """
+    if value is None:
+        return None
+    try:
+        pct = float(value)
+    except (TypeError, ValueError):
+        return None
+    if abs(pct) <= 1.5:
+        return pct * 100
+    return pct
+
 
 def _stooq_ticker(t: str) -> str:
     for src, dst in STOOQ_SUFFIX.items():
@@ -104,6 +122,7 @@ def _currency_from_ticker(ticker: str) -> str:
     return 'USD'
 
 
+@lru_cache(maxsize=64)
 def _usd_fx_rate(currency: str) -> float | None:
     """Return a live USD conversion rate when possible."""
     cur = str(currency or 'USD').upper()
@@ -119,6 +138,27 @@ def _usd_fx_rate(currency: str) -> float | None:
                 return 1.0 / rate
     except Exception as e:
         logger.debug(f"FX lookup failed for {cur}: {e}")
+
+    for url in (
+        f"https://open.er-api.com/v6/latest/{cur}",
+        f"https://api.frankfurter.app/latest?from={cur}&to=USD",
+    ):
+        try:
+            r = httpx.get(url, timeout=10)
+            r.raise_for_status()
+            payload = r.json()
+            if 'rates' in payload and payload['rates'].get('USD'):
+                rate = float(payload['rates']['USD'])
+                if rate > 0:
+                    return rate
+            if payload.get('result') == 'success':
+                rate = payload.get('rates', {}).get('USD')
+                if rate:
+                    rate = float(rate)
+                    if rate > 0:
+                        return rate
+        except Exception as e:
+            logger.debug(f"FX HTTP lookup failed for {cur} via {url}: {e}")
 
     logger.warning(f"No live FX rate available for {cur}; skipping USD conversion.")
     return None
@@ -138,6 +178,27 @@ def persist_ipo_calendar(sb, ipo_rows):
     if not ipo_rows:
         return 0
 
+    tracked = {
+        (str(c.get('ticker') or '').upper()): c.get('name')
+        for c in (TIER1_COMPANIES + TIER2_COMPANIES + TIER3_COMPANIES)
+        if c.get('ticker')
+    }
+    tracked_names = {
+        c.get('name'): c.get('name')
+        for c in (TIER1_COMPANIES + TIER2_COMPANIES + TIER3_COMPANIES)
+        if c.get('name')
+    }
+    company_lookup = {}
+    try:
+        rows = sb.table('companies').select('id, name, ticker').execute().data or []
+        for row in rows:
+            if row.get('name'):
+                company_lookup[row['name']] = row['id']
+            if row.get('ticker'):
+                company_lookup[str(row['ticker']).upper()] = row['id']
+    except Exception as e:
+        logger.debug(f"Could not build company lookup for IPO event linking: {e}")
+
     payload = []
     for row in ipo_rows:
         event_date = row.get('date')
@@ -145,18 +206,32 @@ def persist_ipo_calendar(sb, ipo_rows):
             continue
         symbol = row.get('symbol') or row.get('companySymbol') or row.get('ticker')
         name = row.get('name') or row.get('companyName') or symbol or 'IPO'
+        tracked_name = tracked.get(str(symbol or '').upper()) or tracked_names.get(name)
         event_name = f"{name} IPO"
         company_names = [name] if name else []
         if symbol and symbol not in company_names:
             company_names.append(symbol)
+        company_ids = []
+        if tracked_name:
+            company_names.insert(0, tracked_name)
+            company_id = company_lookup.get(tracked_name) or company_lookup.get(str(symbol or '').upper())
+            if company_id:
+                company_ids.append(company_id)
 
         payload.append({
             'event_name': event_name,
+            'company_ids': company_ids,
             'company_names': company_names,
             'event_date': event_date,
             'event_type': 'ipo',
             'description': 'Finnhub IPO calendar entry.',
             'url': row.get('url'),
+            'source': 'Finnhub',
+            'source_kind': 'market_data_api',
+            'source_priority': 2,
+            'source_region': None,
+            'confidence': 80,
+            'is_official': False,
             'is_upcoming': True,
         })
 
@@ -282,7 +357,7 @@ def main():
                                 market_cap = int(float(info['marketCap']) * fx)
                         price = price or info.get('currentPrice') or info.get('regularMarketPrice')
                         if change_pct is None and info.get('regularMarketChangePercent') is not None:
-                            change_pct = info['regularMarketChangePercent'] * 100
+                            change_pct = _normalize_change_pct(info.get('regularMarketChangePercent'))
                 except Exception as e:
                     logger.error(f"Yfinance quote error for {ticker}: {e}")
 

@@ -21,12 +21,21 @@ ENTITY_TIER_PRIORITY = {
     **{name: 3 for name in TIER3_NAMES},
 }
 
+NEWS_BATCH_MAX_CHARS = 9000
+NEWS_BATCH_MAX_ITEMS = 5
+BRIEFS_BATCH_MAX_CHARS = 12000
+BRIEFS_BATCH_MAX_COMPANIES = 6
+MAX_NEWS_PER_COMPANY = 4
+MAX_COMM_PER_COMPANY = 2
+MAX_INFL_PER_COMPANY = 2
+MAX_SIGNAL_TEXT_CHARS = 180
+
 
 def compute_buzz_v2(item: dict, relevance: float) -> float:
     """Composite ranking score for the news feed.
 
-      buzz_v2 = 0.5*relevance + 0.2*source_credibility + 0.15*hn_engagement + 0.15*recency
-      × 1.2 if any tracked T1 mega-cap is mentioned, capped at 100.
+      buzz_v2 = 0.45*relevance + 0.17*source_credibility + 0.13*hn_engagement + 0.13*recency
+      + official / release / source-priority bonuses, then tier-scaled and capped at 100.
 
     Inputs come from the news_items row + the LLM-rated relevance (0-100).
     """
@@ -51,7 +60,11 @@ def compute_buzz_v2(item: dict, relevance: float) -> float:
     else:
         recency = 50.0  # unknown publish time -> neutral
 
-    base = 0.5 * relevance + 0.2 * cred + 0.15 * hn + 0.15 * recency
+    major_release_bonus = 14.0 if item.get('is_major_release') else 0.0
+    official_bonus = 8.0 if item.get('source_type') == 'official_company' else 0.0
+    category_bonus = 8.0 if item.get('category') in {'release', 'controversy', 'conference', 'earnings'} else 0.0
+    priority_bonus = max(0.0, (4 - float(item.get('source_priority') or 3)) * 4.0)
+    base = 0.45 * relevance + 0.17 * cred + 0.13 * hn + 0.13 * recency + major_release_bonus + official_bonus + category_bonus + priority_bonus
     entity_tiers = [ENTITY_TIER_PRIORITY.get(entity) for entity in (item.get('entity_names') or []) if ENTITY_TIER_PRIORITY.get(entity)]
     if entity_tiers:
         best_tier = min(entity_tiers)
@@ -61,11 +74,37 @@ def compute_buzz_v2(item: dict, relevance: float) -> float:
     return round(min(100.0, base * boost), 2)
 
 
+def _chunk_by_char_budget(items, base_prompt, render_item, max_chars, max_items=None):
+    """Yield (chunk_items, prompt) pairs that stay under a char budget."""
+    chunk = []
+    prompt = base_prompt
+    for idx, item in enumerate(items, start=1):
+        rendered = render_item(item, idx)
+        too_many_items = max_items and len(chunk) >= max_items
+        would_overflow = len(prompt) + len(rendered) > max_chars
+        if chunk and (too_many_items or would_overflow):
+            yield chunk, prompt
+            chunk = []
+            prompt = base_prompt
+            rendered = render_item(item, 1)
+        chunk.append(item)
+        prompt += rendered
+    if chunk:
+        yield chunk, prompt
+
+
+def _clip_text(value, limit=MAX_SIGNAL_TEXT_CHARS):
+    text = (value or "").strip().replace("\n", " ")
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+
 def process_news_batch(sb, items):
     if not items:
         return
 
-    prompt = (
+    base_prompt = (
         "Analyze the following news items. For each, return a JSON object with "
         "'category' (ai/release/ma/ipo/controversy/conference/opensource/earnings/research/other), "
         "'entities' (list of company names), 'sentiment' (-1.0 to 1.0), "
@@ -74,47 +113,51 @@ def process_news_batch(sb, items):
         "— breaking M&A/earnings/lawsuit/major-product news = high; minor PR / opinion = low). "
         "Return a JSON array of these objects in the exact same order.\n\n"
     )
-    for i, item in enumerate(items):
-        prompt += f"Item {i+1}: {item['title']}\n"
+    for chunk_items, prompt in _chunk_by_char_budget(
+        items,
+        base_prompt=base_prompt,
+        render_item=lambda item, idx: f"Item {idx}: {_clip_text(item['title'], 220)}\n",
+        max_chars=NEWS_BATCH_MAX_CHARS,
+        max_items=NEWS_BATCH_MAX_ITEMS,
+    ):
+        try:
+            logger.info(f"Processing LLM news chunk: items={len(chunk_items)} prompt_chars={len(prompt)}")
+            text = generate_llm_content(prompt, sb)
+            results = json.loads(strip_json_fence(text))
 
-    try:
-        text = generate_llm_content(prompt, sb)
-        results = json.loads(strip_json_fence(text))
+            for i, item in enumerate(chunk_items):
+                if i < len(results):
+                    res = results[i]
+                    relevance = float(res.get('relevance', 50))
+                    # Recompute buzz_v2 using the merged entity list the LLM emitted.
+                    merged = dict(item)
+                    merged['entity_names'] = res.get('entities', item.get('entity_names', []))
+                    buzz_v2 = compute_buzz_v2(merged, relevance)
 
-        for i, item in enumerate(items):
-            if i < len(results):
-                res = results[i]
-                relevance = float(res.get('relevance', 50))
-                # Recompute buzz_v2 using the merged entity list the LLM emitted.
-                merged = dict(item)
-                merged['entity_names'] = res.get('entities', item.get('entity_names', []))
-                buzz_v2 = compute_buzz_v2(merged, relevance)
+                    sb.table('news_items').update({
+                        'category': res.get('category', 'other'),
+                        'entity_names': res.get('entities', item.get('entity_names', [])),
+                        'sentiment': res.get('sentiment', item.get('sentiment', 0.0)),
+                        'summary': res.get('summary', ''),
+                        'relevance': relevance,
+                        'buzz_v2': buzz_v2,
+                        'llm_processed': True,
+                    }).eq('id', item['id']).execute()
 
-                sb.table('news_items').update({
-                    'category': res.get('category', 'other'),
-                    'entity_names': res.get('entities', item.get('entity_names', [])),
-                    'sentiment': res.get('sentiment', item.get('sentiment', 0.0)),
-                    'summary': res.get('summary', ''),
-                    'relevance': relevance,
-                    'buzz_v2': buzz_v2,
-                    'llm_processed': True,
-                }).eq('id', item['id']).execute()
-                
-                for entity in res.get('entities', []):
-                    company_res = sb.table('companies').select('id, hype_score, reality_score').eq('name', entity).execute()
-                    if company_res.data:
-                        cid = company_res.data[0]['id']
-                        new_hype = (float(company_res.data[0]['hype_score'] or 50) + float(res.get('hype_score', 50))) / 2
-                        new_real = (float(company_res.data[0]['reality_score'] or 50) + float(res.get('reality_score', 50))) / 2
-                        sb.table('companies').update({
-                            'hype_score': new_hype,
-                            'reality_score': new_real
-                        }).eq('id', cid).execute()
-                        
-        time.sleep(4)
-                        
-    except Exception as e:
-        logger.error(f"Error processing news batch: {e}")
+                    for entity in res.get('entities', []):
+                        company_res = sb.table('companies').select('id, hype_score, reality_score').eq('name', entity).execute()
+                        if company_res.data:
+                            cid = company_res.data[0]['id']
+                            new_hype = (float(company_res.data[0]['hype_score'] or 50) + float(res.get('hype_score', 50))) / 2
+                            new_real = (float(company_res.data[0]['reality_score'] or 50) + float(res.get('reality_score', 50))) / 2
+                            sb.table('companies').update({
+                                'hype_score': new_hype,
+                                'reality_score': new_real
+                            }).eq('id', cid).execute()
+
+            time.sleep(4)
+        except Exception as e:
+            logger.error(f"Error processing news batch: {e}")
 
 def run_dispute_detection(sb):
     logger.info("Running dispute detection")
@@ -179,37 +222,41 @@ def update_company_briefs(sb):
 
         time_limit = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
         
-        # Build one massive prompt for all companies
-        prompt = (
+        base_prompt = (
             "You are a senior tech investor analyst. I will provide recent news and signals for multiple "
             "tech companies. Update the investor brief for EACH company using only the supplied signals.\n"
             "Write for an investor scanning risk, momentum, and what changed recently. Be concrete: mention "
             "the most relevant signal(s), avoid generic growth language, and if evidence is thin say that "
             "clearly instead of inventing conviction.\n\n"
         )
-        
+
+        company_blocks = []
         for comp in companies:
-            news_res = sb.table('news_items').select('title, summary, source_type, source, category, buzz_v2').contains('entity_names', json.dumps([comp["name"]])).gte('ingested_at', time_limit).order('ingested_at', desc=True).limit(5).execute()
+            news_res = sb.table('news_items').select('title, summary, source_type, source, category, buzz_v2, is_major_release').contains('entity_names', json.dumps([comp["name"]])).gte('ingested_at', time_limit).order('ingested_at', desc=True).limit(5).execute()
             comm_res = sb.table('community_signals').select('post_title, sentiment').eq('entity_name', comp['name']).gte('captured_at', time_limit).order('captured_at', desc=True).limit(3).execute()
             inf_res = sb.table('influencer_signals').select('content_title').eq('entity_name', comp['name']).gte('published_at', time_limit).order('published_at', desc=True).limit(3).execute()
-            
-            prompt += f"--- COMPANY: {comp['name']} ---\n"
-            prompt += f"Is Private: {comp.get('is_private', False)}\n"
+
+            block = f"--- COMPANY: {comp['name']} ---\n"
+            block += f"Is Private: {comp.get('is_private', False)}\n"
             if comp.get('last_valuation'):
-                prompt += f"Latest private valuation / market cap field: {comp.get('last_valuation')}\n"
-            prompt += "RECENT SIGNALS:\n"
-            for n in news_res.data:
-                prompt += (
+                block += f"Latest private valuation / market cap field: {comp.get('last_valuation')}\n"
+            block += "RECENT SIGNALS:\n"
+            for n in (news_res.data or [])[:MAX_NEWS_PER_COMPANY]:
+                block += (
                     f"- [NEWS:{n.get('source') or n.get('source_type') or 'unknown'}"
                     f"/{n.get('category') or 'uncategorized'} buzz={n.get('buzz_v2')}] "
-                    f"{n['title']} ({n.get('summary') or 'No summary'})\n"
+                    f"{_clip_text(n['title'])} ({_clip_text(n.get('summary') or 'No summary')})\n"
                 )
-            for c in comm_res.data:
-                prompt += f"- [COMM] {c['post_title']} (sentiment: {c['sentiment']})\n"
-            for i in inf_res.data:
-                prompt += f"- [INFL] {i['content_title']}\n\n"
-                
-        prompt += """
+            for c in (comm_res.data or [])[:MAX_COMM_PER_COMPANY]:
+                block += f"- [COMM] {_clip_text(c['post_title'])} (sentiment: {c['sentiment']})\n"
+            for i in (inf_res.data or [])[:MAX_INFL_PER_COMPANY]:
+                block += f"- [INFL] {_clip_text(i['content_title'])}\n"
+            block += "\n"
+            if next((n for n in (news_res.data or []) if n.get('is_major_release')), None):
+                block += "- [NOTE] One or more official or major releases landed in the last 7 days.\n"
+            company_blocks.append((comp, block))
+
+        suffix = """
 For EACH company provided, you must output a JSON object with its name as the key.
 For each company, provide:
 - "investor_brief": "2 compact sentences based on the recent signals. Sentence 1 should state what changed or the strongest signal. Sentence 2 should state investor implication, risk, or confidence limit."
@@ -225,34 +272,47 @@ Return ONLY a valid JSON object where keys are the exact company names. Example:
   "OpenAI": { "investor_brief": "...", "forecast_direction": "strong_bullish", "forecast_confidence": 90 }
 }
 """
-        
-        max_retries = 3
-        text = ""
-        for attempt in range(max_retries):
+
+        chunks = list(
+            _chunk_by_char_budget(
+                company_blocks,
+                base_prompt=base_prompt,
+                render_item=lambda item, idx: item[1],
+                max_chars=BRIEFS_BATCH_MAX_CHARS - len(suffix),
+                max_items=BRIEFS_BATCH_MAX_COMPANIES,
+            )
+        )
+
+        for chunk, prompt_body in chunks:
+            prompt = prompt_body + suffix
+            logger.info(f"Updating company briefs chunk: companies={len(chunk)} prompt_chars={len(prompt)}")
+            max_retries = 3
+            text = ""
+            for attempt in range(max_retries):
+                try:
+                    text = generate_llm_content(prompt, sb)
+                    break
+                except Exception as e:
+                    if '429' in str(e) and attempt < max_retries - 1:
+                        logger.warning(f"Rate limited. Sleeping for 30s before retry {attempt + 1}/{max_retries}...")
+                        time.sleep(30)
+                    else:
+                        raise e
+
             try:
-                text = generate_llm_content(prompt, sb)
-                break
+                results = json.loads(strip_json_fence(text))
+                for comp, _ in chunk:
+                    cname = comp['name']
+                    if cname in results:
+                        data = results[cname]
+                        update_data = {
+                            'forecast_direction': data.get('forecast_direction', 'neutral'),
+                            'investor_brief': data.get('investor_brief', ''),
+                            'forecast_confidence': data.get('forecast_confidence', 50)
+                        }
+                        sb.table('companies').update(update_data).eq('id', comp['id']).execute()
             except Exception as e:
-                if '429' in str(e) and attempt < max_retries - 1:
-                    logger.warning(f"Rate limited. Sleeping for 30s before retry {attempt + 1}/{max_retries}...")
-                    time.sleep(30)
-                else:
-                    raise e
-        
-        try:
-            results = json.loads(strip_json_fence(text))
-            for comp in companies:
-                cname = comp['name']
-                if cname in results:
-                    data = results[cname]
-                    update_data = {
-                        'forecast_direction': data.get('forecast_direction', 'neutral'),
-                        'investor_brief': data.get('investor_brief', ''),
-                        'forecast_confidence': data.get('forecast_confidence', 50)
-                    }
-                    sb.table('companies').update(update_data).eq('id', comp['id']).execute()
-        except Exception as e:
-            logger.error(f"Error parsing Gemini batch JSON: {e}")
+                logger.error(f"Error parsing LLM batch JSON: {e}")
             
     except Exception as e:
         logger.error(f"Error updating company briefs: {e}")

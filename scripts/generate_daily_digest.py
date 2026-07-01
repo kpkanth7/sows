@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 NEWS_LIMIT = 40
 INSIDER_THRESHOLD = 10_000
+DIGEST_PROMPT_MAX_CHARS = 12000
+SECTION_ITEM_LIMIT = 8
+LINE_ITEM_MAX_CHARS = 220
 
 
 def _fetch_signals(sb):
@@ -161,6 +164,21 @@ def _fetch_signals(sb):
     }
 
 
+def _clip_text(value: str, limit: int = LINE_ITEM_MAX_CHARS) -> str:
+    text = (value or "").strip().replace("\n", " ")
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+
+def _append_line_with_budget(lines, line, budget=DIGEST_PROMPT_MAX_CHARS):
+    trial = "\n".join(lines + [line])
+    if len(trial) > budget:
+        return False
+    lines.append(line)
+    return True
+
+
 def _build_prompt(signals: dict) -> str:
     lines = [
         "You are a senior tech investor analyst.",
@@ -172,77 +190,115 @@ def _build_prompt(signals: dict) -> str:
         "Return ONLY the JSON object — no markdown fences, no preamble.\n",
         "=== TOP NEWS (last 24h, ranked by buzz_v2) ===",
     ]
-    for n in signals['news']:
+    for n in signals['news'][:SECTION_ITEM_LIMIT]:
         cat = n.get('category') or '?'
         ents = ','.join((n.get('entity_names') or [])[:3])
-        lines.append(f"- [{cat}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+        if not _append_line_with_budget(
+            lines,
+            f"- [{cat}] {_clip_text(n['title'])} (entities: {ents}; buzz_v2={n.get('buzz_v2')})",
+        ):
+            return "\n".join(lines)
 
     if signals['sec']:
-        lines.append("\n=== SEC 8-K MATERIAL EVENTS (last 24h) ===")
-        for s in signals['sec']:
+        if not _append_line_with_budget(lines, "\n=== SEC 8-K MATERIAL EVENTS (last 24h) ==="):
+            return "\n".join(lines)
+        for s in signals['sec'][:SECTION_ITEM_LIMIT]:
             ents = ','.join((s.get('entity_names') or [])[:2])
-            lines.append(f"- {s['title']} (entities: {ents})")
+            if not _append_line_with_budget(lines, f"- {_clip_text(s['title'])} (entities: {ents})"):
+                return "\n".join(lines)
 
     if signals['controversy']:
-        lines.append("\n=== CONTROVERSIES / M&A / EARNINGS PRESSURE ===")
-        for n in signals['controversy'][:12]:
+        if not _append_line_with_budget(lines, "\n=== CONTROVERSIES / M&A / EARNINGS PRESSURE ==="):
+            return "\n".join(lines)
+        for n in signals['controversy'][:SECTION_ITEM_LIMIT]:
             ents = ','.join((n.get('entity_names') or [])[:3])
-            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+            if not _append_line_with_budget(
+                lines,
+                f"- [{n.get('category') or '?'}] {_clip_text(n['title'])} (entities: {ents}; buzz_v2={n.get('buzz_v2')})",
+            ):
+                return "\n".join(lines)
 
     if signals['release']:
-        lines.append("\n=== RELEASES / AI / OPEN SOURCE ===")
-        for n in signals['release'][:12]:
+        if not _append_line_with_budget(lines, "\n=== RELEASES / AI / OPEN SOURCE ==="):
+            return "\n".join(lines)
+        for n in signals['release'][:SECTION_ITEM_LIMIT]:
             ents = ','.join((n.get('entity_names') or [])[:3])
-            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+            if not _append_line_with_budget(
+                lines,
+                f"- [{n.get('category') or '?'}] {_clip_text(n['title'])} (entities: {ents}; buzz_v2={n.get('buzz_v2')})",
+            ):
+                return "\n".join(lines)
 
     if signals['research']:
-        lines.append("\n=== RESEARCH / PAPERS ===")
-        for n in signals['research'][:12]:
+        if not _append_line_with_budget(lines, "\n=== RESEARCH / PAPERS ==="):
+            return "\n".join(lines)
+        for n in signals['research'][:SECTION_ITEM_LIMIT]:
             ents = ','.join((n.get('entity_names') or [])[:3])
-            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+            if not _append_line_with_budget(
+                lines,
+                f"- [{n.get('category') or '?'}] {_clip_text(n['title'])} (entities: {ents}; buzz_v2={n.get('buzz_v2')})",
+            ):
+                return "\n".join(lines)
 
     if signals['conference']:
-        lines.append("\n=== CONFERENCES / IPOS ===")
-        for n in signals['conference'][:12]:
+        if not _append_line_with_budget(lines, "\n=== CONFERENCES / IPOS ==="):
+            return "\n".join(lines)
+        for n in signals['conference'][:SECTION_ITEM_LIMIT]:
             ents = ','.join((n.get('entity_names') or [])[:3])
-            lines.append(f"- [{n.get('category') or '?'}] {n['title']} (entities: {ents}; buzz_v2={n.get('buzz_v2')})")
+            if not _append_line_with_budget(
+                lines,
+                f"- [{n.get('category') or '?'}] {_clip_text(n['title'])} (entities: {ents}; buzz_v2={n.get('buzz_v2')})",
+            ):
+                return "\n".join(lines)
 
     if signals['community']:
-        lines.append("\n=== COMMUNITY SIGNALS (Reddit / Hacker News) ===")
-        for c in signals['community']:
-            lines.append(
+        if not _append_line_with_budget(lines, "\n=== COMMUNITY SIGNALS (Reddit / Hacker News) ==="):
+            return "\n".join(lines)
+        for c in signals['community'][:SECTION_ITEM_LIMIT]:
+            if not _append_line_with_budget(
+                lines,
                 f"- {c.get('source') or '?'} · {c.get('post_title') or '?'} "
-                f"(entity: {c.get('entity_name') or '?'}; sentiment={c.get('sentiment')})"
-            )
+                f"(entity: {c.get('entity_name') or '?'}; sentiment={c.get('sentiment')})",
+            ):
+                return "\n".join(lines)
 
     if signals['dark_horse']:
-        lines.append("\n=== DARK-HORSE MOVERS ===")
-        for d in signals['dark_horse']:
+        if not _append_line_with_budget(lines, "\n=== DARK-HORSE MOVERS ==="):
+            return "\n".join(lines)
+        for d in signals['dark_horse'][:SECTION_ITEM_LIMIT]:
             co = d.get('companies') or {}
-            lines.append(
+            if not _append_line_with_budget(
+                lines,
                 f"- #{d.get('rank')} {co.get('ticker') or co.get('name') or '?'} "
-                f"score={d.get('score')} reasons={', '.join(d.get('reasons') or [])}"
-            )
+                f"score={d.get('score')} reasons={', '.join(d.get('reasons') or [])}",
+            ):
+                return "\n".join(lines)
 
     if signals['insider']:
-        lines.append("\n=== NOTABLE INSIDER TRADES (last 24h, >=10K shares) ===")
-        for i in signals['insider']:
+        if not _append_line_with_budget(lines, "\n=== NOTABLE INSIDER TRADES (last 24h, >=10K shares) ==="):
+            return "\n".join(lines)
+        for i in signals['insider'][:SECTION_ITEM_LIMIT]:
             co = i.get('companies') or {}
             sign = '+' if (i.get('change') or 0) > 0 else ''
-            lines.append(
+            if not _append_line_with_budget(
+                lines,
                 f"- {co.get('ticker','?')} · {i.get('person','?')} ({i.get('position','?')}) "
-                f"{sign}{i.get('change')} shares · {i.get('transaction_type','')}"
-            )
+                f"{sign}{i.get('change')} shares · {i.get('transaction_type','')}",
+            ):
+                return "\n".join(lines)
 
     if signals['upcoming_earn']:
-        lines.append("\n=== UPCOMING EARNINGS (next 7d) ===")
-        for e in signals['upcoming_earn']:
+        if not _append_line_with_budget(lines, "\n=== UPCOMING EARNINGS (next 7d) ==="):
+            return "\n".join(lines)
+        for e in signals['upcoming_earn'][:SECTION_ITEM_LIMIT]:
             co = e.get('companies') or {}
-            lines.append(f"- {co.get('ticker','?')} {e.get('earnings_date')} {e.get('hour') or ''}")
+            if not _append_line_with_budget(lines, f"- {co.get('ticker','?')} {e.get('earnings_date')} {e.get('hour') or ''}"):
+                return "\n".join(lines)
 
     if signals['recent_earn']:
-        lines.append("\n=== RECENT EARNINGS (last 7d) ===")
-        for e in signals['recent_earn']:
+        if not _append_line_with_budget(lines, "\n=== RECENT EARNINGS (last 7d) ==="):
+            return "\n".join(lines)
+        for e in signals['recent_earn'][:SECTION_ITEM_LIMIT]:
             co = e.get('companies') or {}
             beat = ''
             if e.get('eps_actual') is not None and e.get('eps_estimate') is not None:
@@ -250,7 +306,8 @@ def _build_prompt(signals: dict) -> str:
                 beat = f" (EPS {'beat' if d >= 0 else 'miss'} {abs(d):.2f})"
             sd = e.get('sentiment_delta')
             sd_str = f" sentiment Δ {sd:+.2f}" if sd is not None else ''
-            lines.append(f"- {co.get('ticker','?')} {e.get('earnings_date')}{beat}{sd_str}")
+            if not _append_line_with_budget(lines, f"- {co.get('ticker','?')} {e.get('earnings_date')}{beat}{sd_str}"):
+                return "\n".join(lines)
 
     return "\n".join(lines)
 

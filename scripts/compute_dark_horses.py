@@ -10,6 +10,7 @@ Composite score (each sub-score normalized to 0-100, equal weight):
   2. News volume z-score           (last-7d daily count vs prior-23d baseline)
   3. Analyst upgrade momentum      ((upgrades - downgrades) last 7d, cohort-normalized)
   4. Insider+market combined       (avg of insider buy ratio + stock 7d % momentum)
+  5. Catalyst / release heat       (official upcoming event + major release density)
 
 Equal weighting is deliberate: user explicitly chose all 4 signal families
 to dilute single-source bias.
@@ -146,6 +147,33 @@ def _stock_by_company(sb, since_iso):
     return out
 
 
+def _catalyst_by_company(sb, today_iso, future_iso, since_iso):
+    events = (
+        sb.table('events_calendar')
+          .select('company_ids, event_date, source_priority, confidence')
+          .gte('event_date', today_iso)
+          .lte('event_date', future_iso)
+          .limit(1000)
+          .execute()
+    )
+    news = (
+        sb.table('news_items')
+          .select('entity_names, is_major_release')
+          .eq('is_major_release', True)
+          .gte('ingested_at', since_iso)
+          .limit(5000)
+          .execute()
+    )
+    out = defaultdict(lambda: {'events': [], 'releases': 0})
+    for row in (events.data or []):
+        for cid in (row.get('company_ids') or []):
+            out[cid]['events'].append(row)
+    for row in (news.data or []):
+        for entity in (row.get('entity_names') or []):
+            out[entity]['releases'] += 1
+    return out
+
+
 def _daily_counts(date_list, today, lookback):
     """date_list -> per-day count array (length=lookback, index 0 = today)."""
     counts = defaultdict(int)
@@ -226,7 +254,26 @@ def _reasons(components):
         out.append('Analysts piling on')
     if components['market'] >= REASON_THRESHOLD:
         out.append('Insider + market confirm')
+    if components['catalyst'] >= REASON_THRESHOLD:
+        out.append('Catalyst window opening')
     return out
+
+
+def _catalyst_score(company, catalyst_rows):
+    event_score = 0.0
+    for event in catalyst_rows.get('events', []):
+        try:
+            days = max(0, (datetime.fromisoformat(str(event['event_date'])) - datetime.now()).days)
+        except Exception:
+            days = 30
+        urgency = max(0.0, 80.0 - min(days, 30) * 2.5)
+        quality = 10.0 if int(event.get('source_priority') or 3) == 1 else 4.0
+        conf = float(event.get('confidence') or 75) * 0.1
+        event_score = max(event_score, urgency + quality + conf)
+
+    release_score = min(100.0, float(catalyst_rows.get('releases') or 0) * 22.0)
+    name_boost = 10.0 if company['name'] in {'OpenAI', 'Anthropic', 'Google', 'Microsoft', 'NVIDIA'} else 0.0
+    return round(min(100.0, max(event_score, release_score) + name_boost), 2)
 
 
 def main():
@@ -241,6 +288,7 @@ def main():
     upgrades = _upgrade_by_company(sb, since_7d.date().isoformat())
     insiders = _insider_by_company(sb, since_30d.date().isoformat())
     stocks = _stock_by_company(sb, _iso(since_7d))
+    catalysts = _catalyst_by_company(sb, today.isoformat(), (today + timedelta(days=45)).isoformat(), _iso(since_30d))
 
     # Cohort max for analyst normalization (so we get a real spread).
     cohort_net = []
@@ -259,8 +307,12 @@ def main():
             'news': _news_score(news.get(name, []), today),
             'analyst': _analyst_score(upgrades.get(cid, []), max_net),
             'market': _insider_market_score(insiders.get(cid, []), stocks.get(cid, [])),
+            'catalyst': _catalyst_score(c, {
+                'events': catalysts.get(cid, {}).get('events', []),
+                'releases': catalysts.get(name, {}).get('releases', 0),
+            }),
         }
-        score = round(sum(comp.values()) / 4.0, 2)
+        score = round(sum(comp.values()) / 5.0, 2)
         rows.append({
             'company_id': cid,
             'score': score,

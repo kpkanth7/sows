@@ -2,7 +2,7 @@ name: Ingest & Process (Every 6hr)
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "5 */6 * * *"
   workflow_dispatch:
 
 jobs:
@@ -72,14 +72,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: python scripts/ingest_github.py
 
-      - name: 5b. Ingest Finnhub Extras
-        continue-on-error: true
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: python scripts/ingest_finnhub_extras.py
-
       - name: 6. Ingest Product Hunt
         continue-on-error: true
         env:
@@ -96,34 +88,6 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python scripts/ingest_huggingface.py
-
-      - name: 7. Run LLM Batch
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          LLM_PROVIDER_CHAIN: ${{ secrets.LLM_PROVIDER_CHAIN }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
-        run: python scripts/run_llm_batch.py
-
-      - name: 8. Update Influencer Trust
-        continue-on-error: true
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Phase 3.8: trust now LLM-validates claims via the rotating provider chain.
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          LLM_PROVIDER_CHAIN: ${{ secrets.LLM_PROVIDER_CHAIN }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
-        run: python scripts/update_influencer_trust.py
 
       - name: 9. Check Buzz Spikes
         continue-on-error: true

@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import re
 from dotenv import load_dotenv
@@ -42,8 +42,30 @@ def get_client() -> Client:
         raise RuntimeError("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set")
     return create_client(supabase_url, supabase_key)
 
+
+def _parse_timestamp(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        text = str(value).replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(text)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _minute_bucket_calls(row: dict, now: datetime) -> int:
+    last_updated = _parse_timestamp(row.get("last_updated"))
+    if not last_updated:
+        return 0
+    if now - last_updated >= timedelta(minutes=1):
+        return 0
+    return int(row.get("calls_this_min") or 0)
+
 def check_quota(sb: Client, source_name: str, cost: int = 1) -> bool:
-    """Returns True if quota OK, False if near limit (>90%)"""
+    """Returns True if daily and minute budgets are both comfortably available."""
     try:
         res = sb.table("api_quota_log").select("*").eq("source_name", source_name).execute()
         if not res.data:
@@ -60,45 +82,71 @@ def check_quota(sb: Client, source_name: str, cost: int = 1) -> bool:
                 return True
             return True
         row = res.data[0]
+        now = datetime.now(timezone.utc)
         today = str(date.today())
-        
+
         if row.get("last_reset") != today:
             sb.table("api_quota_log").update({
                 "calls_today": 0,
                 "last_reset": today
             }).eq("source_name", source_name).execute()
             row["calls_today"] = 0
-            
+            row["calls_this_min"] = 0
+
         calls_today = row.get("calls_today", 0)
         daily_limit = row.get("daily_limit", 100)
-        
         if calls_today + cost > daily_limit * 0.9:
             logger.warning(f"Quota near limit for {source_name}: {calls_today}/{daily_limit}")
             return False
-            
+
+        per_min_limit = row.get("per_min_limit")
+        if per_min_limit:
+            calls_this_min = _minute_bucket_calls(row, now)
+            if calls_this_min + cost > per_min_limit * 0.9:
+                logger.warning(f"Minute quota near limit for {source_name}: {calls_this_min}/{per_min_limit}")
+                return False
+
         return True
     except Exception as e:
         logger.error(f"Error in check_quota: {e}")
         return False  # Fail-safe: deny on error rather than blow past API limits
 
 def log_api_call(sb: Client, source_name: str, cost: int = 1):
-    """Increment daily counter. Upserts the row if it does not exist yet."""
+    """Increment daily and minute counters. Upserts the row if it does not exist yet."""
     try:
-        res = sb.table("api_quota_log").select("calls_today").eq("source_name", source_name).execute()
+        res = (
+            sb.table("api_quota_log")
+            .select("calls_today, calls_this_min, daily_limit, per_min_limit, last_reset, last_updated")
+            .eq("source_name", source_name)
+            .execute()
+        )
+        now = datetime.now(timezone.utc)
+        today = str(date.today())
         if not res.data:
+            defaults = LLM_QUOTA_DEFAULTS.get(source_name, {})
             # No row yet — create one so tracking works on a fresh DB
             sb.table("api_quota_log").upsert({
                 "source_name": source_name,
                 "calls_today": cost,
-                "daily_limit": 1000,
-                "last_reset": str(date.today())
+                "daily_limit": defaults.get("daily_limit", 1000),
+                "calls_this_min": cost,
+                "per_min_limit": defaults.get("per_min_limit"),
+                "last_reset": today,
+                "last_updated": now.isoformat(),
             }, on_conflict="source_name").execute()
             return
         row = res.data[0]
-        calls_today = (row.get("calls_today") or 0) + cost
+        calls_today = int(row.get("calls_today") or 0)
+        if row.get("last_reset") != today:
+            calls_today = 0
+
+        calls_this_min = _minute_bucket_calls(row, now)
 
         sb.table("api_quota_log").update({
-            "calls_today": calls_today
+            "calls_today": calls_today + cost,
+            "calls_this_min": calls_this_min + cost,
+            "last_reset": today,
+            "last_updated": now.isoformat(),
         }).eq("source_name", source_name).execute()
     except Exception as e:
         logger.error(f"Error in log_api_call: {e}")

@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS companies (
     hype_score        NUMERIC(5,2) DEFAULT 50,  -- media attention
     reality_score     NUMERIC(5,2) DEFAULT 50,  -- actual traction
     controversy_score NUMERIC(5,2) DEFAULT 0,   -- 0-100
+    momentum_score    NUMERIC(5,2) DEFAULT 0,   -- 0-100
+    risk_score        NUMERIC(5,2) DEFAULT 0,   -- 0-100
+    catalyst_score    NUMERIC(5,2) DEFAULT 0,   -- 0-100
 
     -- Investor signals (updated by LLM batch)
     forecast_direction TEXT CHECK (forecast_direction IN ('strong_bullish','bullish','neutral','bearish','high_risk')),
@@ -69,7 +72,13 @@ CREATE INDEX IF NOT EXISTS idx_companies_buzz ON companies(buzz_score DESC);
 
 -- Idempotent add for existing DBs (CREATE TABLE above is a no-op once table exists).
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS region TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS momentum_score NUMERIC(5,2) DEFAULT 0;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS risk_score NUMERIC(5,2) DEFAULT 0;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS catalyst_score NUMERIC(5,2) DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_companies_region ON companies(region);
+CREATE INDEX IF NOT EXISTS idx_companies_momentum ON companies(momentum_score DESC);
+CREATE INDEX IF NOT EXISTS idx_companies_risk ON companies(risk_score DESC);
+CREATE INDEX IF NOT EXISTS idx_companies_catalyst ON companies(catalyst_score DESC);
 
 -- ============================================================
 -- STOCK SNAPSHOTS (time-series)
@@ -98,14 +107,20 @@ CREATE TABLE IF NOT EXISTS news_items (
 
     -- Source metadata
     source              TEXT NOT NULL,        -- 'hackernews', 'rss_techcrunch', 'reddit', etc.
-    source_type         TEXT NOT NULL CHECK (source_type IN ('news','research','community','influencer','code')),
+    source_type         TEXT NOT NULL CHECK (source_type IN ('news','research','community','influencer','code','official_company')),
     source_credibility_tier INT NOT NULL DEFAULT 3 CHECK (source_credibility_tier IN (1,2,3,4)),
+    source_domain       TEXT,
+    source_region       TEXT,
+    source_kind         TEXT,
+    source_priority     INT DEFAULT 3 CHECK (source_priority IN (1,2,3,4,5)),
 
     -- Content
-    category            TEXT CHECK (category IN ('ai','release','ma','ipo','controversy','conference','opensource','earnings','other')),
+    category            TEXT CHECK (category IN ('ai','release','ma','ipo','controversy','conference','opensource','earnings','research','other')),
     entity_names        JSONB DEFAULT '[]',   -- array of company/tech names mentioned
     sentiment           NUMERIC(4,2),         -- -1.0 to 1.0
     buzz_score          NUMERIC(5,2) DEFAULT 0,
+    entity_tier_max     INT,
+    is_major_release    BOOLEAN DEFAULT false,
 
     -- Dispute tracking
     is_disputed         BOOLEAN DEFAULT false,
@@ -131,9 +146,26 @@ CREATE TABLE IF NOT EXISTS news_items (
     ingested_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE news_items DROP CONSTRAINT IF EXISTS news_items_source_type_check;
+ALTER TABLE news_items
+    ADD CONSTRAINT news_items_source_type_check
+    CHECK (source_type IN ('news','research','community','influencer','code','official_company'));
+ALTER TABLE news_items DROP CONSTRAINT IF EXISTS news_items_category_check;
+ALTER TABLE news_items
+    ADD CONSTRAINT news_items_category_check
+    CHECK (category IN ('ai','release','ma','ipo','controversy','conference','opensource','earnings','research','other'));
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS source_domain TEXT;
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS source_region TEXT;
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS source_kind TEXT;
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS source_priority INT DEFAULT 3;
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS entity_tier_max INT;
+ALTER TABLE news_items ADD COLUMN IF NOT EXISTS is_major_release BOOLEAN DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS idx_news_ingested ON news_items(ingested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_news_category ON news_items(category);
 CREATE INDEX IF NOT EXISTS idx_news_buzz ON news_items(buzz_score DESC);
+CREATE INDEX IF NOT EXISTS idx_news_source_priority ON news_items(source_priority, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_news_major_release ON news_items(is_major_release) WHERE is_major_release = true;
 CREATE INDEX IF NOT EXISTS idx_news_disputed ON news_items(is_disputed) WHERE is_disputed = true;
 CREATE INDEX IF NOT EXISTS idx_news_entities ON news_items USING GIN(entity_names);
 CREATE INDEX IF NOT EXISTS idx_news_llm_unprocessed ON news_items(llm_processed) WHERE llm_processed = false;
@@ -311,11 +343,24 @@ CREATE TABLE IF NOT EXISTS events_calendar (
     event_type      TEXT CHECK (event_type IN ('conference','earnings','ipo','product_launch','acquisition','funding')),
     description     TEXT,
     url             TEXT,
+    source          TEXT,
+    source_kind     TEXT,
+    source_priority INT DEFAULT 3 CHECK (source_priority IN (1,2,3,4,5)),
+    source_region   TEXT,
+    confidence      NUMERIC(5,2) DEFAULT 75,
+    is_official     BOOLEAN DEFAULT false,
     is_upcoming     BOOLEAN, -- Computed on frontend or updated via worker
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE events_calendar ADD COLUMN IF NOT EXISTS source TEXT;
+ALTER TABLE events_calendar ADD COLUMN IF NOT EXISTS source_kind TEXT;
+ALTER TABLE events_calendar ADD COLUMN IF NOT EXISTS source_priority INT DEFAULT 3;
+ALTER TABLE events_calendar ADD COLUMN IF NOT EXISTS source_region TEXT;
+ALTER TABLE events_calendar ADD COLUMN IF NOT EXISTS confidence NUMERIC(5,2) DEFAULT 75;
+ALTER TABLE events_calendar ADD COLUMN IF NOT EXISTS is_official BOOLEAN DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_events_date ON events_calendar(event_date);
+CREATE INDEX IF NOT EXISTS idx_events_priority ON events_calendar(source_priority, event_date);
 
 -- ============================================================
 -- COMPANY POLL CONFIG (tier management)

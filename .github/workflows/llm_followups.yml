@@ -1,0 +1,69 @@
+name: LLM Followups (Every 6hr)
+
+on:
+  schedule:
+    - cron: "30 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  llm_followups:
+    name: Run LLM Post-Processing
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: scripts
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r scripts/requirements.txt
+
+      - name: 1. Run LLM Batch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          LLM_PROVIDER_CHAIN: ${{ secrets.LLM_PROVIDER_CHAIN }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+        run: python scripts/run_llm_batch.py
+
+      - name: 2. Update Influencer Trust
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          LLM_PROVIDER_CHAIN: ${{ secrets.LLM_PROVIDER_CHAIN }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+        run: python scripts/update_influencer_trust.py
+
+      - name: 3. Sync Official Events
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/sync_official_events.py
+
+      - name: 4. Update Company Scores
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/update_company_scores.py
+
+      - name: 5. Compute Dark-Horse Movers
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/compute_dark_horses.py

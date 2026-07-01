@@ -6,7 +6,7 @@ name: Daily Investor Digest
 # finished, so the digest is built from the freshest data.
 on:
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "20 2 * * *"
   workflow_dispatch:
 
 jobs:

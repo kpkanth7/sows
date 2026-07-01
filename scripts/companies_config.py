@@ -272,6 +272,76 @@ OFFICIAL_COMPANY_SOURCE_REGISTRY = {
     'CoreWeave': {
         'pages': ['https://www.coreweave.com/blog'],
     },
+    'Perplexity': {
+        'pages': ['https://www.perplexity.ai/hub/blog'],
+    },
+    'MongoDB': {
+        'feeds': ['https://www.mongodb.com/blog/rss.xml'],
+        'pages': ['https://www.mongodb.com/blog'],
+    },
+    'Oracle': {
+        'pages': ['https://www.oracle.com/news/'],
+    },
+    'IBM': {
+        'feeds': ['https://newsroom.ibm.com/feed'],
+        'pages': ['https://newsroom.ibm.com/'],
+    },
+    'Shopify': {
+        'feeds': ['https://www.shopify.com/news/rss.xml'],
+        'pages': ['https://www.shopify.com/news'],
+    },
+    'Coinbase': {
+        'pages': ['https://www.coinbase.com/blog'],
+    },
+    'Figma': {
+        'pages': ['https://www.figma.com/blog/'],
+    },
+    'Vercel': {
+        'feeds': ['https://vercel.com/blog/rss.xml'],
+        'pages': ['https://vercel.com/blog'],
+    },
+    'Supabase': {
+        'feeds': ['https://supabase.com/blog/rss.xml'],
+        'pages': ['https://supabase.com/blog'],
+    },
+    'GitLab': {
+        'feeds': ['https://about.gitlab.com/atom.xml'],
+        'pages': ['https://about.gitlab.com/releases/'],
+    },
+    'Datadog': {
+        'feeds': ['https://www.datadoghq.com/blog/rss/'],
+        'pages': ['https://www.datadoghq.com/blog/'],
+    },
+    'Zoom': {
+        'pages': ['https://blog.zoom.us/'],
+    },
+    'Okta': {
+        'feeds': ['https://www.okta.com/blog/feed/'],
+        'pages': ['https://www.okta.com/blog/'],
+    },
+    'Confluent': {
+        'feeds': ['https://www.confluent.io/blog/feed/'],
+        'pages': ['https://www.confluent.io/blog/'],
+    },
+    'Elastic': {
+        'feeds': ['https://www.elastic.co/blog/feed'],
+        'pages': ['https://www.elastic.co/blog/'],
+    },
+    'Cohere': {
+        'pages': ['https://cohere.com/blog'],
+    },
+    'ElevenLabs': {
+        'pages': ['https://elevenlabs.io/blog'],
+    },
+    'Cursor': {
+        'pages': ['https://cursor.com/changelog'],
+    },
+    'Mistral': {
+        'pages': ['https://mistral.ai/news/'],
+    },
+    'Groq': {
+        'pages': ['https://groq.com/news/'],
+    },
 }
 
 OFFICIAL_COMPANY_SOURCE_URLS = sorted({
@@ -279,6 +349,118 @@ OFFICIAL_COMPANY_SOURCE_URLS = sorted({
     for spec in OFFICIAL_COMPANY_SOURCE_REGISTRY.values()
     for url in (*spec.get('feeds', []), *spec.get('pages', []))
 })
+
+SOURCE_REGION_BY_DOMAIN = {
+    'openai.com': 'US',
+    'anthropic.com': 'US',
+    'google.com': 'US',
+    'microsoft.com': 'US',
+    'apple.com': 'US',
+    'aws.amazon.com': 'US',
+    'nvidia.com': 'US',
+    'salesforce.com': 'US',
+    'adobe.com': 'US',
+    'servicenow.com': 'US',
+    'palantir.com': 'US',
+    'snowflake.com': 'US',
+    'databricks.com': 'US',
+    'cloudflare.com': 'US',
+    'mongodb.com': 'US',
+    'vercel.com': 'US',
+    'supabase.com': 'US',
+    'groq.com': 'US',
+    'cohere.com': 'Canada',
+    'mistral.ai': 'Europe',
+    'huggingface.co': 'Europe',
+    'shopify.com': 'Canada',
+}
+
+OFFICIAL_EVENT_CATALOG = [
+    {
+        'event_name': 'AWS re:Invent 2026',
+        'company_names': ['Amazon'],
+        'event_date': '2026-11-30',
+        'event_type': 'conference',
+        'description': 'Amazon Web Services annual conference in Las Vegas.',
+        'url': 'https://aws.amazon.com/events/reinvent/',
+        'source': 'Amazon',
+        'source_kind': 'official_event_page',
+        'source_priority': 1,
+        'source_region': 'US',
+        'confidence': 98,
+        'is_official': True,
+    },
+    {
+        'event_name': 'Dreamforce 2026',
+        'company_names': ['Salesforce'],
+        'event_date': '2026-09-15',
+        'event_type': 'conference',
+        'description': 'Salesforce annual conference in San Francisco and Salesforce+.',
+        'url': 'https://www.salesforce.com/dreamforce/',
+        'source': 'Salesforce',
+        'source_kind': 'official_event_page',
+        'source_priority': 1,
+        'source_region': 'US',
+        'confidence': 98,
+        'is_official': True,
+    },
+    {
+        'event_name': 'Adobe MAX 2026',
+        'company_names': ['Adobe'],
+        'event_date': '2026-11-10',
+        'event_type': 'conference',
+        'description': 'Adobe creativity conference in Miami Beach and online.',
+        'url': 'https://max.adobe.com/',
+        'source': 'Adobe',
+        'source_kind': 'official_event_page',
+        'source_priority': 1,
+        'source_region': 'US',
+        'confidence': 98,
+        'is_official': True,
+    },
+    {
+        'event_name': 'Oracle AI World 2026',
+        'company_names': ['Oracle'],
+        'event_date': '2026-10-25',
+        'event_type': 'conference',
+        'description': 'Oracle AI World conference in Las Vegas.',
+        'url': 'https://www.oracle.com/ai-world/',
+        'source': 'Oracle',
+        'source_kind': 'official_event_page',
+        'source_priority': 1,
+        'source_region': 'US',
+        'confidence': 98,
+        'is_official': True,
+    },
+    {
+        'event_name': 'NVIDIA GTC Berlin 2026',
+        'company_names': ['NVIDIA'],
+        'event_date': '2026-10-20',
+        'event_type': 'conference',
+        'description': 'NVIDIA GTC Berlin event.',
+        'url': 'https://www.nvidia.com/gtc/',
+        'source': 'NVIDIA',
+        'source_kind': 'official_event_page',
+        'source_priority': 1,
+        'source_region': 'Europe',
+        'confidence': 98,
+        'is_official': True,
+    },
+    {
+        'event_name': 'NVIDIA GTC 2027',
+        'company_names': ['NVIDIA'],
+        'event_date': '2027-03-15',
+        'event_type': 'conference',
+        'description': 'NVIDIA GTC annual conference.',
+        'url': 'https://www.nvidia.com/gtc/',
+        'source': 'NVIDIA',
+        'source_kind': 'official_event_page',
+        'source_priority': 1,
+        'source_region': 'US',
+        'confidence': 95,
+        'is_official': True,
+    },
+]
 
 YOUTUBE_CHANNELS = [
     {'name': 'Fireship', 'channel_id': 'UCsBjURrPoezykLs9EqgamOA', 'category': 'software', 'playlist_id': 'UUsBjURrPoezykLs9EqgamOA'},
@@ -333,7 +515,13 @@ RSS_FEEDS = [
     'https://supabase.com/blog/rss.xml',
     'https://aws.amazon.com/blogs/machine-learning/feed/',
     'https://stripe.com/blog/feed.xml',
-    'https://www.mongodb.com/blog/rss.xml'
+    'https://www.mongodb.com/blog/rss.xml',
+    'https://www.datadoghq.com/blog/rss/',
+    'https://www.confluent.io/blog/feed/',
+    'https://www.elastic.co/blog/feed',
+    'https://www.okta.com/blog/feed/',
+    'https://newsroom.ibm.com/feed',
+    'https://www.shopify.com/news/rss.xml'
 ]
 
 # GitHub release feeds for both companies and major open-source projects.
